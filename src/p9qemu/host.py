@@ -200,8 +200,15 @@ def resolve_acceleration(
                 "advertise WHPX support"
             )
         return Acceleration(
-            "WHPX with userspace irqchip and 2 vCPUs (no fallback)",
-            ("-smp", "2", "-accel", "whpx,kernel-irqchip=off"),
+            "WHPX with userspace irqchip, 2 vCPUs, and SDL (no fallback)",
+            (
+                "-smp",
+                "2",
+                "-accel",
+                "whpx,kernel-irqchip=off",
+                "-display",
+                "sdl",
+            ),
         )
 
     usable = kvm_is_usable() if kvm_usable is None else kvm_usable

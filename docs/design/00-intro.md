@@ -195,9 +195,11 @@ second controlled profile therefore used
 `-accel whpx,kernel-irqchip=off`, changing only interrupt-controller placement.
 That profile eventually booted but was extremely slow and unresponsive. Agent9
 then demonstrated responsive, confirmed WHPX operation on the same host with
-the same irqchip setting and two virtual CPUs. The next controlled profile adds
-only `-smp 2`, while retaining the proven CPU model, storage, networking, and
-display settings.
+the same irqchip setting and two virtual CPUs. Adding only `-smp 2` brought up
+the second CPU in stock 9front but did not improve responsiveness. Because
+Agent9 also explicitly uses the SDL display backend, the next controlled
+profile adds only `-display sdl`, while retaining the current CPU, storage, and
+network settings.
 
 ## Executable discovery
 

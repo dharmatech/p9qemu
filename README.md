@@ -122,9 +122,11 @@ interrupt controller in userspace. Bare WHPX hung stock 9front during LAPIC
 setup; disabling the kernel irqchip allowed it to boot, but only after a long
 delay and with severe input and display latency. An Agent9 comparison guest
 running under confirmed WHPX was responsive and used two virtual CPUs among its
-other differences, so the next single-variable experiment adds `-smp 2`. The
-profile retains p9qemu's proven storage, networking, display, and memory
-settings, and it still has no TCG fallback.
+other differences. Adding `-smp 2` brought up the second CPU in stock 9front but
+did not improve responsiveness. Agent9 also explicitly selects SDL, so the next
+single-variable experiment adds `-display sdl`. The profile retains p9qemu's
+proven storage, networking, and memory settings, and it still has no TCG
+fallback.
 
 Use `p9qemu start --dry-run` to display the resolved command without launching
 the VM. QEMU inherits the terminal normally; `p9qemu` never executes commands

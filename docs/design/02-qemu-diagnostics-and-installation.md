@@ -104,7 +104,10 @@ kept every other known-working VM setting intact, and retained strict
 no-fallback behavior. It eventually reached Rio but had severe input and display
 latency. A responsive Agent9 comparison run confirmed that WHPX and the same
 irqchip setting can work on this host; its boot log also showed a second virtual
-CPU. The third experiment therefore adds only `-smp 2` to stock 9front.
+CPU. The third experiment added only `-smp 2` to stock 9front. The second CPU
+initialized, but input and display latency remained. The fourth experiment
+therefore retains that baseline and adds only Agent9's explicit `-display sdl`
+selection.
 A future `doctor` command should report both the accelerators compiled into
 QEMU and, where it can be determined safely, whether the corresponding host
 facility can initialize. Compiled-in support and usable host acceleration are
