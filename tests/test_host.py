@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -7,6 +8,7 @@ from p9qemu.host import (
     HostInfo,
     discover_qemu,
     parse_os_release,
+    query_qemu_accelerators,
     resolve_acceleration,
     user_cache_dir,
 )
@@ -103,10 +105,63 @@ def test_auto_acceleration_uses_kvm_when_available() -> None:
 
 def test_auto_acceleration_falls_back_portably() -> None:
     result = resolve_acceleration("auto", HostInfo("Windows"), kvm_usable=True)
-    assert result.name == "software emulation"
-    assert result.arguments == ()
+    assert result.name == "TCG software emulation"
+    assert result.arguments == ("-accel", "tcg")
 
 
 def test_requested_kvm_must_be_usable() -> None:
     with pytest.raises(P9QemuError, match="/dev/kvm"):
         resolve_acceleration("kvm", HostInfo("Linux"), kvm_usable=False)
+
+
+def test_explicit_tcg_is_portable() -> None:
+    result = resolve_acceleration("tcg", HostInfo("Windows"))
+    assert result.name == "TCG software emulation"
+    assert result.arguments == ("-accel", "tcg")
+
+
+def test_explicit_whpx_requires_windows_and_advertised_support() -> None:
+    result = resolve_acceleration(
+        "whpx",
+        HostInfo("Windows"),
+        available_accelerators={"tcg", "whpx"},
+    )
+    assert result.name == "WHPX (no fallback)"
+    assert result.arguments == ("-accel", "whpx")
+
+    with pytest.raises(P9QemuError, match="only on Windows"):
+        resolve_acceleration(
+            "whpx",
+            HostInfo("Linux"),
+            available_accelerators={"tcg", "whpx"},
+        )
+    with pytest.raises(P9QemuError, match="does not advertise WHPX"):
+        resolve_acceleration(
+            "whpx",
+            HostInfo("Windows"),
+            available_accelerators={"tcg"},
+        )
+
+
+def test_query_qemu_accelerators_parses_qemu_output() -> None:
+    commands: list[list[str]] = []
+
+    def runner(command: list[str], **_kwargs):
+        commands.append(command)
+        return SimpleNamespace(
+            returncode=0,
+            stdout=("Accelerators supported in QEMU binary:\ntcg\nwhpx\n"),
+            stderr="",
+        )
+
+    result = query_qemu_accelerators("qemu-system-x86_64", runner=runner)
+    assert result == frozenset({"tcg", "whpx"})
+    assert commands == [["qemu-system-x86_64", "-accel", "help"]]
+
+
+def test_query_qemu_accelerators_reports_query_failure() -> None:
+    def runner(_command: list[str], **_kwargs):
+        return SimpleNamespace(returncode=1, stdout="", stderr="query failed")
+
+    with pytest.raises(P9QemuError, match="status 1: query failed"):
+        query_qemu_accelerators("qemu-system-x86_64", runner=runner)

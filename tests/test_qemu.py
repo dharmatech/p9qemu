@@ -12,7 +12,7 @@ from p9qemu.qemu import (
 )
 
 
-NONE = Acceleration("software emulation", ())
+TCG = Acceleration("TCG software emulation", ("-accel", "tcg"))
 KVM = Acceleration("KVM", ("-cpu", "host", "-accel", "kvm"))
 
 
@@ -24,12 +24,14 @@ def test_install_command_matches_plan9_storage_and_network_profile() -> None:
         disk=disk,
         iso=iso,
         memory_mib=1024,
-        acceleration=NONE,
+        acceleration=TCG,
     )
     assert command == [
         "qemu-system-x86_64",
         "-m",
         "1024",
+        "-accel",
+        "tcg",
         "-net",
         "nic,model=virtio,macaddr=00:20:91:37:33:77",
         "-net",
@@ -92,5 +94,5 @@ def test_comma_in_drive_path_is_rejected() -> None:
             "qemu-system-x86_64",
             disk=Path("bad,name.qcow2"),
             memory_mib=2048,
-            acceleration=NONE,
+            acceleration=TCG,
         )

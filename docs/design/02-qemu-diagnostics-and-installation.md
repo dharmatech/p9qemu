@@ -96,6 +96,13 @@ The command should distinguish a missing optional accelerator from a missing
 required executable. Software emulation can remain usable even when KVM or a
 Windows acceleration backend is unavailable.
 
+The initial opt-in WHPX implementation queries `qemu-system-x86_64 -accel help`
+before launch and fails clearly when that QEMU build does not advertise WHPX.
+A future `doctor` command should report both the accelerators compiled into
+QEMU and, where it can be determined safely, whether the corresponding host
+facility can initialize. Compiled-in support and usable host acceleration are
+different states.
+
 Machine-readable output, for example `p9qemu doctor --json`, may be useful for
 support and automation later, but is not required for the first diagnostic
 implementation.

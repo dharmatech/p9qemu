@@ -18,8 +18,11 @@ from p9qemu.constants import (
 )
 from p9qemu.errors import P9QemuError
 from p9qemu.host import (
+    Acceleration,
+    HostInfo,
     current_host,
     discover_qemu,
+    query_qemu_accelerators,
     resolve_acceleration,
     user_cache_dir,
 )
@@ -54,7 +57,7 @@ def _add_runtime_options(parser: argparse.ArgumentParser, *, memory: int) -> Non
     )
     parser.add_argument(
         "--accel",
-        choices=("auto", "kvm", "none"),
+        choices=("auto", "kvm", "whpx", "tcg"),
         default="auto",
         help="acceleration mode (default: auto)",
     )
@@ -120,6 +123,19 @@ def _progress(quiet: bool):
     return write
 
 
+def _select_acceleration(
+    requested: str, host: HostInfo, executable: str
+) -> Acceleration:
+    if requested == "whpx" and host.system == "Windows":
+        available = query_qemu_accelerators(executable)
+        return resolve_acceleration(
+            requested,
+            host,
+            available_accelerators=available,
+        )
+    return resolve_acceleration(requested, host)
+
+
 def _run_qemu(command: list[str], *, system: str, dry_run: bool, quiet: bool) -> int:
     if not quiet:
         heading = "Would start QEMU:" if dry_run else "Starting QEMU:"
@@ -137,7 +153,7 @@ def _install(args: argparse.Namespace) -> int:
     validate_disk_size(args.disk_size)
     host = current_host()
     executables = discover_qemu(host)
-    acceleration = resolve_acceleration(args.accel, host)
+    acceleration = _select_acceleration(args.accel, host, executables.system)
     progress = _progress(args.quiet)
     disk = _absolute(args.disk)
     cache = user_cache_dir(host)
@@ -197,7 +213,7 @@ def _install(args: argparse.Namespace) -> int:
 def _start(args: argparse.Namespace) -> int:
     host = current_host()
     executables = discover_qemu(host)
-    acceleration = resolve_acceleration(args.accel, host)
+    acceleration = _select_acceleration(args.accel, host, executables.system)
     progress = _progress(args.quiet)
     disk = _absolute(args.disk)
     if not disk.exists():

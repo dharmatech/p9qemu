@@ -5,8 +5,9 @@ running [9front](https://9front.org/) virtual machines with QEMU. It keeps each
 VM in an ordinary directory and prints the exact QEMU command before every
 launch, so the underlying configuration remains visible and copyable.
 
-The project is in early version 1 development. Linux is the primary tested
-target; Windows support is included and will receive further VM-level testing.
+The project is in early version 1 development. Installation, startup, and guest
+networking have been tested on Ubuntu under WSL with KVM and on native Windows
+11 with TCG software emulation.
 
 ## Prerequisites
 
@@ -80,7 +81,7 @@ Useful installer options include:
 --disk PATH       Disk-image path
 --disk-size SIZE  Size of a newly created disk (default: 30G)
 --memory MIB      Guest memory in MiB (default: 1024)
---accel MODE      auto, kvm, or none
+--accel MODE      auto, kvm, whpx, or tcg
 --iso-url URL     Override the installation archive URL
 --iso-sha256 HEX  Checksum for an overridden archive
 --dry-run         Validate and show actions without changing state
@@ -101,8 +102,24 @@ $ p9qemu start
 The default runtime profile uses 2048 MiB of memory, VirtIO networking, VirtIO
 SCSI storage, and the localhost-only port forwards established by the original
 `9front-notes` scripts. On Linux, `--accel auto` uses KVM when `/dev/kvm` is
-accessible. Windows currently uses portable software emulation until a Windows
-acceleration profile has been tested.
+accessible and otherwise uses TCG. Windows `auto` currently uses the proven TCG
+profile while WHPX is validated against stock 9front.
+
+Windows users may explicitly test hardware acceleration with:
+
+```console
+> p9qemu start --accel whpx
+```
+
+Before changing instance state, p9qemu verifies that the installed QEMU binary
+advertises WHPX support. The Windows Hypervisor Platform feature must also be
+enabled for QEMU to initialize WHPX. Explicit WHPX mode has no TCG fallback, so
+the test cannot silently run under software emulation. Use `--accel tcg` to
+force the portable known-working profile.
+
+The WHPX profile changes only the accelerator. It deliberately retains QEMU's
+default CPU and interrupt-controller behavior and leaves p9qemu's proven
+storage, networking, display, memory, and CPU-count settings unchanged.
 
 Use `p9qemu start --dry-run` to display the resolved command without launching
 the VM. QEMU inherits the terminal normally; `p9qemu` never executes commands

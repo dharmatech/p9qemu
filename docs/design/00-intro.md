@@ -181,10 +181,17 @@ produce nonzero exit codes without corrupting existing data.
 
 `p9qemu start` runs an existing instance without the installation ISO. It uses
 2048 MiB by default and preserves the localhost-only port forwards from the
-field-tested Linux scripts. Both commands accept `--accel auto|kvm|none`;
-`auto` selects KVM on Linux when `/dev/kvm` is accessible and otherwise uses
-portable software emulation. Both commands print the resolved QEMU command
-before launch and support `--dry-run` and `--quiet`.
+field-tested Linux scripts. Both commands accept
+`--accel auto|kvm|whpx|tcg`; `auto` selects KVM on Linux when `/dev/kvm` is
+accessible and otherwise uses TCG software emulation. Windows `auto` remains on
+the proven TCG profile while explicit WHPX is validated. Both commands print
+the resolved QEMU command before launch and support `--dry-run` and `--quiet`.
+
+Explicit `--accel whpx` is available only on Windows and first verifies that
+the installed QEMU binary advertises WHPX through `-accel help`. It intentionally
+has no fallback so tests cannot silently run under TCG. The opt-in profile adds
+only `-accel whpx`; it does not change the CPU model, interrupt controller,
+virtual CPU count, storage, networking, or display.
 
 ## Executable discovery
 
@@ -323,5 +330,6 @@ comprehensible utility rather than becoming a general VM manager.
    addresses are deferred until concurrent instances are supported.
 5. Version 1 requires Python 3.11 or newer.
 
-Windows acceleration remains intentionally unresolved until the relevant QEMU
-and hypervisor profiles can be investigated and tested.
+Windows hardware acceleration remains opt-in while the conservative WHPX
+profile is tested. After successful installation and runtime testing, Windows
+`auto` may prefer WHPX with an ordered TCG fallback.

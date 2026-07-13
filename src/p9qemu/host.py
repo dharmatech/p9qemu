@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
+import subprocess
 
 from p9qemu.errors import P9QemuError
 
@@ -31,6 +33,11 @@ class QemuExecutables:
 class Acceleration:
     name: str
     arguments: tuple[str, ...]
+
+
+AcceleratorRunner = Callable[..., subprocess.CompletedProcess[str]]
+
+_ACCELERATOR_NAME = re.compile(r"^[a-z][a-z0-9_-]*$")
 
 
 def parse_os_release(text: str) -> dict[str, str]:
@@ -135,14 +142,64 @@ def kvm_is_usable(*, device: Path = Path("/dev/kvm")) -> bool:
     return device.exists() and os.access(device, os.R_OK | os.W_OK)
 
 
+def query_qemu_accelerators(
+    executable: str,
+    *,
+    runner: AcceleratorRunner = subprocess.run,
+) -> frozenset[str]:
+    command = [executable, "-accel", "help"]
+    try:
+        result = runner(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        raise P9QemuError(
+            f"could not query QEMU accelerator support: {error}"
+        ) from error
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        suffix = f": {detail}" if detail else ""
+        raise P9QemuError(
+            f"QEMU accelerator query exited with status {result.returncode}{suffix}"
+        )
+
+    output = f"{result.stdout}\n{result.stderr}"
+    accelerators = frozenset(
+        line.strip().lower()
+        for line in output.splitlines()
+        if _ACCELERATOR_NAME.fullmatch(line.strip().lower())
+    )
+    if not accelerators:
+        raise P9QemuError(
+            "QEMU did not report any supported accelerators from -accel help"
+        )
+    return accelerators
+
+
 def resolve_acceleration(
     requested: str,
     host: HostInfo,
     *,
     kvm_usable: bool | None = None,
+    available_accelerators: Collection[str] | None = None,
 ) -> Acceleration:
-    if requested == "none":
-        return Acceleration("software emulation", ())
+    if requested == "tcg":
+        return Acceleration("TCG software emulation", ("-accel", "tcg"))
+
+    if requested == "whpx":
+        if host.system != "Windows":
+            raise P9QemuError("WHPX acceleration is available only on Windows hosts")
+        if available_accelerators is None:
+            raise P9QemuError("WHPX support was not queried from QEMU")
+        if "whpx" not in available_accelerators:
+            raise P9QemuError(
+                "WHPX acceleration was requested, but this QEMU build does not "
+                "advertise WHPX support"
+            )
+        return Acceleration("WHPX (no fallback)", ("-accel", "whpx"))
 
     usable = kvm_is_usable() if kvm_usable is None else kvm_usable
     if requested == "kvm":
@@ -159,4 +216,4 @@ def resolve_acceleration(
         raise P9QemuError(f"unsupported acceleration mode: {requested}")
     if host.system == "Linux" and usable:
         return Acceleration("KVM", ("-cpu", "host", "-accel", "kvm"))
-    return Acceleration("software emulation", ())
+    return Acceleration("TCG software emulation", ("-accel", "tcg"))
