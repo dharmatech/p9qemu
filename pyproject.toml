@@ -1,0 +1,23 @@
+[project]
+name = "p9qemu"
+version = "0.1.0"
+description = "Create, install, and run transparent 9front QEMU virtual machines"
+readme = "README.md"
+authors = [
+    { name = "Dharmatech" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+p9qemu = "p9qemu:main"
+
+[build-system]
+requires = ["uv_build>=0.9.6,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.15.21",
+]

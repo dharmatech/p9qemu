@@ -74,11 +74,11 @@ create ordinary directories for their instances:
 ```text
 9front-vms/
   main/
-    9front.qcow2
+    9front.qcow2.img
   auth/
-    9front.qcow2
+    9front.qcow2.img
   experiments/
-    9front.qcow2
+    9front.qcow2.img
 ```
 
 Creating another VM means creating another directory, not cloning the source
@@ -116,10 +116,10 @@ media should be reused.
 
 ## Disk image
 
-The initial default disk is `9front.qcow2`, with a virtual size of `30G`:
+The initial default disk is `9front.qcow2.img`, with a virtual size of `30G`:
 
 ```console
-$ qemu-img create -f qcow2 9front.qcow2 30G
+$ qemu-img create -f qcow2 9front.qcow2.img 30G
 ```
 
 QCOW2 images are sparse, so this does not immediately consume 30 GB. A requested
@@ -145,7 +145,7 @@ The reference command is conceptually:
 qemu-system-x86_64 -m 1024 \
   -net nic,model=virtio,macaddr=00:20:91:37:33:77 -net user \
   -device virtio-scsi-pci,id=scsi \
-  -drive if=none,id=vd0,file=9front.qcow2 \
+  -drive if=none,id=vd0,file=9front.qcow2.img,format=qcow2 \
   -device scsi-hd,drive=vd0 \
   -drive if=none,id=vd1,file=9front-11554.amd64.iso,format=raw \
   -device scsi-cd,drive=vd1,bootindex=0
@@ -161,6 +161,7 @@ The public interface begins with:
 
 ```console
 p9qemu install [OPTIONS]
+p9qemu start [OPTIONS]
 ```
 
 Likely initial options:
@@ -177,6 +178,13 @@ Defaults should make the ordinary command require no options. Errors should be
 concise and actionable. Missing QEMU programs, invalid arguments, download or
 decompression failures, checksum mismatches, and filesystem conflicts must
 produce nonzero exit codes without corrupting existing data.
+
+`p9qemu start` runs an existing instance without the installation ISO. It uses
+2048 MiB by default and preserves the localhost-only port forwards from the
+field-tested Linux scripts. Both commands accept `--accel auto|kvm|none`;
+`auto` selects KVM on Linux when `/dev/kvm` is accessible and otherwise uses
+portable software emulation. Both commands print the resolved QEMU command
+before launch and support `--dry-run` and `--quiet`.
 
 ## Executable discovery
 
@@ -283,7 +291,6 @@ integration can later test Windows, Linux, and macOS.
 
 ## Non-goals for version 1
 
-- Starting an installed VM as a separate workflow
 - A global registry of named instances
 - Complex configuration files
 - Backups and snapshots
@@ -297,28 +304,24 @@ integration can later test Windows, Linux, and macOS.
 
 ## Expected evolution
 
-After installation works reliably on Windows and Linux, the likely next feature
-is starting an installed image without the ISO:
+Downloadable post-install base images are the likely next major workflow; they
+are described in `01-downloadable-post-install-images.md`. Commands such as
+`create`, `download`, `command`, `backup`, or `drawterm` should be added only in
+response to concrete workflows. `p9qemu` should remain a focused,
+comprehensible utility rather than becoming a general VM manager.
 
-```console
-$ p9qemu start
-```
+## Resolved version 1 decisions
 
-Commands such as `create`, `download`, `command`, `backup`, or `drawterm` should
-be added only in response to concrete workflows. `p9qemu` should remain a
-focused, comprehensible utility rather than becoming a general VM manager.
+1. The compressed archive's SHA-256 digest is
+   `5aaf54327b4bb73a17e192488dc3e65d9d8e526728732e2fdf402bccb8c60236`,
+   as published in its GitHub release metadata.
+2. The default disk is `9front.qcow2.img`, matching the established scripts.
+3. `--dry-run` validates arguments, paths, cached archives, and installed QEMU
+   programs while performing no downloads, decompression, disk creation, or VM
+   launch.
+4. Version 1 retains the established fixed MAC address. Unique per-instance
+   addresses are deferred until concurrent instances are supported.
+5. Version 1 requires Python 3.11 or newer.
 
-## Open questions
-
-1. What is the authoritative SHA-256 digest of the compressed archive and/or
-   unpacked ISO?
-2. Should the default disk be `9front.qcow2`, `9front.qcow2.img`, or another
-   existing convention?
-3. Should `--dry-run` also validate cached artifacts and installed programs?
-4. Should the original fixed MAC address remain, be derived per instance, or be
-   configurable before concurrent VMs are supported?
-5. What minimum Python version balances modern standard-library features with
-   host availability?
-
-These do not block scaffolding. Their resolutions should be recorded in later
-numbered design notes or updates to this document.
+Windows acceleration remains intentionally unresolved until the relevant QEMU
+and hypervisor profiles can be investigated and tested.
