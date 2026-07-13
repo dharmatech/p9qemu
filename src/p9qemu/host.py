@@ -199,7 +199,10 @@ def resolve_acceleration(
                 "WHPX acceleration was requested, but this QEMU build does not "
                 "advertise WHPX support"
             )
-        return Acceleration("WHPX (no fallback)", ("-accel", "whpx"))
+        return Acceleration(
+            "WHPX with userspace irqchip (no fallback)",
+            ("-accel", "whpx,kernel-irqchip=off"),
+        )
 
     usable = kvm_is_usable() if kvm_usable is None else kvm_usable
     if requested == "kvm":

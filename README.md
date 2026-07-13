@@ -117,9 +117,11 @@ enabled for QEMU to initialize WHPX. Explicit WHPX mode has no TCG fallback, so
 the test cannot silently run under software emulation. Use `--accel tcg` to
 force the portable known-working profile.
 
-The WHPX profile changes only the accelerator. It deliberately retains QEMU's
-default CPU and interrupt-controller behavior and leaves p9qemu's proven
-storage, networking, display, memory, and CPU-count settings unchanged.
+The experimental WHPX profile uses `kernel-irqchip=off` so QEMU emulates the
+interrupt controller in userspace. This is a narrowly scoped compatibility
+experiment prompted by stock 9front hanging during LAPIC setup with bare WHPX.
+The profile retains p9qemu's proven CPU, storage, networking, display, memory,
+and CPU-count settings, and it still has no TCG fallback.
 
 Use `p9qemu start --dry-run` to display the resolved command without launching
 the VM. QEMU inherits the terminal normally; `p9qemu` never executes commands

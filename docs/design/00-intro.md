@@ -189,9 +189,11 @@ the resolved QEMU command before launch and support `--dry-run` and `--quiet`.
 
 Explicit `--accel whpx` is available only on Windows and first verifies that
 the installed QEMU binary advertises WHPX through `-accel help`. It intentionally
-has no fallback so tests cannot silently run under TCG. The opt-in profile adds
-only `-accel whpx`; it does not change the CPU model, interrupt controller,
-virtual CPU count, storage, networking, or display.
+has no fallback so tests cannot silently run under TCG. Bare WHPX initialized on
+the initial Windows 11 test host but stock 9front hung during LAPIC setup. The
+next controlled profile therefore uses `-accel whpx,kernel-irqchip=off`, changing
+only interrupt-controller placement while retaining the proven CPU model,
+virtual CPU count, storage, networking, and display settings.
 
 ## Executable discovery
 

@@ -98,6 +98,10 @@ Windows acceleration backend is unavailable.
 
 The initial opt-in WHPX implementation queries `qemu-system-x86_64 -accel help`
 before launch and fails clearly when that QEMU build does not advertise WHPX.
+A bare WHPX runtime test subsequently initialized the accelerator but hung stock
+9front during LAPIC setup. The next single-variable experiment disables the
+kernel irqchip, keeps every other known-working VM setting intact, and retains
+strict no-fallback behavior so a successful boot cannot actually be TCG.
 A future `doctor` command should report both the accelerators compiled into
 QEMU and, where it can be determined safely, whether the corresponding host
 facility can initialize. Compiled-in support and usable host acceleration are

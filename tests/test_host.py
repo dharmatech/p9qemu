@@ -126,8 +126,8 @@ def test_explicit_whpx_requires_windows_and_advertised_support() -> None:
         HostInfo("Windows"),
         available_accelerators={"tcg", "whpx"},
     )
-    assert result.name == "WHPX (no fallback)"
-    assert result.arguments == ("-accel", "whpx")
+    assert result.name == "WHPX with userspace irqchip (no fallback)"
+    assert result.arguments == ("-accel", "whpx,kernel-irqchip=off")
 
     with pytest.raises(P9QemuError, match="only on Windows"):
         resolve_acceleration(
