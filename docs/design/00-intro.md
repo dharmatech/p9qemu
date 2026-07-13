@@ -181,8 +181,34 @@ produce nonzero exit codes without corrupting existing data.
 ## Executable discovery
 
 Version 1 requires `qemu-img` and `qemu-system-x86_64`. Discover them through
-`PATH` using standard Python facilities. When missing, name the executable and
-explain that QEMU must be installed and placed on `PATH`.
+`PATH` using standard Python facilities. When either program is missing, report
+all missing programs together, explain that QEMU must be installed and placed
+on `PATH`, and provide concise, actionable installation guidance for recognized
+supported platforms.
+
+For a recognized Ubuntu host, the error should show the verified native package
+installation command. On Windows, it should point to trusted QEMU installation
+instructions; a package-manager command should be shown only after its package
+identifier and behavior have been verified. Unknown Linux distributions should
+receive a generic message that names the required executables rather than an
+unreliable guessed command.
+
+For example, the shape of an Ubuntu error is:
+
+```text
+p9qemu: qemu-img and qemu-system-x86_64 were not found.
+
+Install QEMU on Ubuntu with:
+
+  sudo apt install qemu-system-x86 qemu-utils
+
+Then run p9qemu again.
+```
+
+Installation advice is informational in version 1. `p9qemu` must not invoke
+`sudo`, a system package manager, or a graphical installer. Host detection and
+advice should be isolated from executable discovery so the advice can evolve
+without changing QEMU command construction.
 
 Hard-coded QEMU installation paths and automatic QEMU installation are outside
 the version 1 scope.
@@ -241,6 +267,8 @@ Tests should cover:
 - Windows and POSIX command rendering
 - dry-run behavior
 - missing executable errors
+- recognized-platform installation guidance
+- generic guidance for unknown platforms
 
 The standard development workflow is:
 
