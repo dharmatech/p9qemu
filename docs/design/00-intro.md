@@ -198,8 +198,11 @@ then demonstrated responsive, confirmed WHPX operation on the same host with
 the same irqchip setting and two virtual CPUs. Adding only `-smp 2` brought up
 the second CPU in stock 9front but did not improve responsiveness. Because
 Agent9 also explicitly uses the SDL display backend, the next controlled
-profile adds only `-display sdl`, while retaining the current CPU, storage, and
-network settings.
+profile added only `-display sdl`, while retaining the current CPU, storage, and
+network settings. That profile booted quickly and was highly responsive. The
+next minimization profile removes `-smp 2` while retaining SDL to determine
+whether the second virtual CPU is necessary. The complete test history is in
+[`03-windows-whpx-experiments.md`](03-windows-whpx-experiments.md).
 
 ## Executable discovery
 

@@ -106,8 +106,12 @@ latency. A responsive Agent9 comparison run confirmed that WHPX and the same
 irqchip setting can work on this host; its boot log also showed a second virtual
 CPU. The third experiment added only `-smp 2` to stock 9front. The second CPU
 initialized, but input and display latency remained. The fourth experiment
-therefore retains that baseline and adds only Agent9's explicit `-display sdl`
-selection.
+retained that baseline and added only Agent9's explicit `-display sdl`
+selection. Stock 9front then booted quickly and was highly responsive. The
+fifth experiment removes `-smp 2` while retaining SDL. See
+[`03-windows-whpx-experiments.md`](03-windows-whpx-experiments.md) for the full
+manual test matrix and environment details.
+
 A future `doctor` command should report both the accelerators compiled into
 QEMU and, where it can be determined safely, whether the corresponding host
 facility can initialize. Compiled-in support and usable host acceleration are

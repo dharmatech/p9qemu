@@ -200,10 +200,8 @@ def resolve_acceleration(
                 "advertise WHPX support"
             )
         return Acceleration(
-            "WHPX with userspace irqchip, 2 vCPUs, and SDL (no fallback)",
+            "WHPX with userspace irqchip and SDL (no fallback)",
             (
-                "-smp",
-                "2",
                 "-accel",
                 "whpx,kernel-irqchip=off",
                 "-display",

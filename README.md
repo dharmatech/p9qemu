@@ -124,9 +124,14 @@ delay and with severe input and display latency. An Agent9 comparison guest
 running under confirmed WHPX was responsive and used two virtual CPUs among its
 other differences. Adding `-smp 2` brought up the second CPU in stock 9front but
 did not improve responsiveness. Agent9 also explicitly selects SDL, so the next
-single-variable experiment adds `-display sdl`. The profile retains p9qemu's
-proven storage, networking, and memory settings, and it still has no TCG
-fallback.
+single-variable experiment added `-display sdl`; stock 9front then booted
+quickly and was highly responsive. The current minimization experiment removes
+`-smp 2` while retaining SDL. The profile keeps p9qemu's proven storage,
+networking, and memory settings, and it still has no TCG fallback.
+
+The complete development-host test matrix, including unsuccessful profiles and
+the Agent9 comparison, is recorded in
+[`docs/design/03-windows-whpx-experiments.md`](docs/design/03-windows-whpx-experiments.md).
 
 Use `p9qemu start --dry-run` to display the resolved command without launching
 the VM. QEMU inherits the terminal normally; `p9qemu` never executes commands
@@ -154,4 +159,5 @@ $ uv run p9qemu --help
 Tests never download the production ISO, create a real large disk, launch a VM,
 or require QEMU to be installed.
 
-Design notes live in [`docs/design`](docs/design).
+Design notes live in [`docs/design`](docs/design), including the
+[Windows acceleration experiment log](docs/design/03-windows-whpx-experiments.md).

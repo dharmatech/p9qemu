@@ -133,11 +133,9 @@ def test_explicit_whpx_queries_qemu_and_prints_required_profile(
     assert result == 0
     assert queried == [executable]
     output = capsys.readouterr().out
-    assert (
-        "Acceleration: WHPX with userspace irqchip, 2 vCPUs, and SDL "
-        "(no fallback)" in output
-    )
-    assert "-smp 2 -accel whpx,kernel-irqchip=off -display sdl" in output
+    assert "Acceleration: WHPX with userspace irqchip and SDL (no fallback)" in output
+    assert "-accel whpx,kernel-irqchip=off -display sdl" in output
+    assert "-smp" not in output
 
 
 def test_explicit_whpx_fails_early_when_qemu_does_not_advertise_it(
