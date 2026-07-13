@@ -191,9 +191,13 @@ Explicit `--accel whpx` is available only on Windows and first verifies that
 the installed QEMU binary advertises WHPX through `-accel help`. It intentionally
 has no fallback so tests cannot silently run under TCG. Bare WHPX initialized on
 the initial Windows 11 test host but stock 9front hung during LAPIC setup. The
-next controlled profile therefore uses `-accel whpx,kernel-irqchip=off`, changing
-only interrupt-controller placement while retaining the proven CPU model,
-virtual CPU count, storage, networking, and display settings.
+second controlled profile therefore used
+`-accel whpx,kernel-irqchip=off`, changing only interrupt-controller placement.
+That profile eventually booted but was extremely slow and unresponsive. Agent9
+then demonstrated responsive, confirmed WHPX operation on the same host with
+the same irqchip setting and two virtual CPUs. The next controlled profile adds
+only `-smp 2`, while retaining the proven CPU model, storage, networking, and
+display settings.
 
 ## Executable discovery
 
