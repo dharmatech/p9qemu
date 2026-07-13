@@ -7,7 +7,9 @@ launch, so the underlying configuration remains visible and copyable.
 
 The project is in early version 1 development. Installation, startup, and guest
 networking have been tested on Ubuntu under WSL with KVM and on native Windows
-11 with TCG software emulation.
+11 with TCG software emulation. The opt-in Windows WHPX profile has also passed
+boot and desktop-responsiveness testing on the development host; its remaining
+installation, networking, and broader compatibility checks are still pending.
 
 ## Prerequisites
 
@@ -125,9 +127,12 @@ running under confirmed WHPX was responsive and used two virtual CPUs among its
 other differences. Adding `-smp 2` brought up the second CPU in stock 9front but
 did not improve responsiveness. Agent9 also explicitly selects SDL, so the next
 single-variable experiment added `-display sdl`; stock 9front then booted
-quickly and was highly responsive. The current minimization experiment removes
-`-smp 2` while retaining SDL. The profile keeps p9qemu's proven storage,
-networking, and memory settings, and it still has no TCG fallback.
+quickly and was highly responsive. Removing `-smp 2` while retaining SDL
+produced the same fast, responsive result, demonstrating that a second virtual
+CPU is unnecessary for this compatibility profile. The resulting minimal
+profile is `-accel whpx,kernel-irqchip=off -display sdl`. It keeps p9qemu's
+proven storage, networking, and memory settings, and it still has no TCG
+fallback.
 
 The complete development-host test matrix, including unsuccessful profiles and
 the Agent9 comparison, is recorded in

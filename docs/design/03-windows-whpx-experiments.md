@@ -51,7 +51,7 @@ describes practical usability, not merely whether QEMU accepted the command.
 | 2 | `-accel whpx,kernel-irqchip=off` | Passed LAPIC setup and eventually reached Rio, but boot, display updates, and mouse input were extremely slow. | Booted but unusable | Userspace irqchip avoided the initial stop but did not provide a usable default-display VM. |
 | 3 | `-smp 2 -accel whpx,kernel-irqchip=off` | `cpu1` initialized, but boot, display, and mouse latency remained. | Booted but unusable | A second virtual CPU was not sufficient. |
 | 4 | `-smp 2 -accel whpx,kernel-irqchip=off -display sdl` | Booted quickly; Rio, display updates, mouse input, and the desktop were highly responsive. | Passed runtime/UI test | SDL was the decisive change on this development host. |
-| 5 | `-accel whpx,kernel-irqchip=off -display sdl` | Pending manual test. | Pending | Determines whether SDL is sufficient without a second virtual CPU. |
+| 5 | `-accel whpx,kernel-irqchip=off -display sdl` | Booted quickly; Rio and the desktop were highly responsive. | Passed runtime/UI test | SDL is sufficient; a second virtual CPU is unnecessary. |
 
 The repeated `mpintrassign: can't find bus type 12, number 0` message and a
 roughly 999–1000 MHz LAPIC clock appeared in both slow stock-9front and fast
@@ -104,11 +104,12 @@ responsiveness observations recorded above.
    under WHPX.
 3. On this host, the default QEMU display frontend becomes extremely slow with
    the tested WHPX profile; explicit SDL makes the guest fast and responsive.
-4. Two virtual CPUs are not sufficient to fix the problem. Experiment 5 will
-   determine whether they are unnecessary once SDL is enabled.
+4. Two virtual CPUs are neither sufficient to fix the default-display problem
+   nor necessary once SDL is enabled. The minimal successful development-host
+   profile is `-accel whpx,kernel-irqchip=off -display sdl`.
 5. WHPX remains explicit and has no silent fallback while validation continues.
 
-Before considering WHPX for Windows `auto`, the minimal successful profile
-should pass repeated startup, guest networking, clean shutdown, and a complete
+Before considering WHPX for Windows `auto`, this minimal profile should still
+pass repeated startup, guest networking, clean shutdown, and a complete
 installation on the development host. Testing on additional Windows machines
 and QEMU versions is also desirable.

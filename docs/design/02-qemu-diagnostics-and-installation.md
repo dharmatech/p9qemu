@@ -108,7 +108,10 @@ CPU. The third experiment added only `-smp 2` to stock 9front. The second CPU
 initialized, but input and display latency remained. The fourth experiment
 retained that baseline and added only Agent9's explicit `-display sdl`
 selection. Stock 9front then booted quickly and was highly responsive. The
-fifth experiment removes `-smp 2` while retaining SDL. See
+fifth experiment removed `-smp 2` while retaining SDL and produced the same
+fast, responsive result, showing that the second virtual CPU is unnecessary.
+The resulting minimal profile is
+`-accel whpx,kernel-irqchip=off -display sdl`. See
 [`03-windows-whpx-experiments.md`](03-windows-whpx-experiments.md) for the full
 manual test matrix and environment details.
 

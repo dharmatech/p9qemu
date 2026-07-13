@@ -200,8 +200,11 @@ the second CPU in stock 9front but did not improve responsiveness. Because
 Agent9 also explicitly uses the SDL display backend, the next controlled
 profile added only `-display sdl`, while retaining the current CPU, storage, and
 network settings. That profile booted quickly and was highly responsive. The
-next minimization profile removes `-smp 2` while retaining SDL to determine
-whether the second virtual CPU is necessary. The complete test history is in
+final minimization profile removed `-smp 2` while retaining SDL and produced the
+same fast, responsive result. A second virtual CPU is therefore unnecessary for
+the current compatibility profile, whose minimal acceleration and display
+arguments are `-accel whpx,kernel-irqchip=off -display sdl`. The complete test
+history is in
 [`03-windows-whpx-experiments.md`](03-windows-whpx-experiments.md).
 
 ## Executable discovery
