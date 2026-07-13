@@ -25,15 +25,21 @@ def validate_disk_size(size: str) -> None:
         )
 
 
-def inspect_disk(path: Path, size: str, *, progress: Progress) -> bool:
+def _disk_exists(path: Path, size: str) -> bool:
     validate_disk_size(size)
     if path.exists():
         if not path.is_file():
             raise P9QemuError(f"disk path exists but is not a file: {path}")
-        progress(f"Using existing disk image: {path}")
         return True
     if not path.parent.is_dir():
         raise P9QemuError(f"disk parent directory does not exist: {path.parent}")
+    return False
+
+
+def inspect_disk(path: Path, size: str, *, progress: Progress) -> bool:
+    if _disk_exists(path, size):
+        progress(f"Using existing disk image: {path}")
+        return True
     progress(f"Would create {size} QCOW2 disk image: {path}")
     return False
 
@@ -46,7 +52,8 @@ def prepare_disk(
     progress: Progress,
     runner: Runner = subprocess.run,
 ) -> None:
-    if inspect_disk(path, size, progress=progress):
+    if _disk_exists(path, size):
+        progress(f"Using existing disk image: {path}")
         return
 
     temporary = path.with_name(f".{path.name}.p9qemu-{uuid4().hex}.part")
