@@ -6,6 +6,12 @@ Future direction beyond version 1. The initial proof of concept should target
 Linux and one pinned 9front release. This design does not yet add a runtime
 dependency or commit to Windows automation.
 
+The first internal implementation slice now provides a strict parser for the
+11554 HJFS reference answers, an ISO-bound installer-profile revision, console
+normalization, and state-machine replay against the digest-pinned manual
+transcript. It does not yet launch QEMU, control a live installer, add Pexpect,
+or expose a public CLI option.
+
 ## Motivation
 
 An interactive installation can be documented with a console transcript, but
