@@ -2,9 +2,9 @@
 
 ## Status
 
-Prepared for publication as an unmodified upstream-media mirror. The planned
-GitHub release does not exist yet, so its asset URL must not be used by the
-application until the upload and checksum verification steps have completed.
+Canonical metadata for an unmodified upstream-media mirror. The application
+must use the release asset URL only after the upload and independent checksum
+verification steps have completed.
 
 ## Identity
 
