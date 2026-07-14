@@ -11,8 +11,10 @@ reference answers, an ISO-bound installer profile, console normalization,
 state-machine replay against the digest-pinned manual transcript, and a live
 Linux Pexpect transport. Pexpect is currently a development dependency only.
 The live transport has completed an unattended installation and a disk-only
-post-install boot validation. The resulting image is a retained development
-artifact, not a published or publishable image bundle.
+post-install boot validation. A reusable internal validator now performs the
+same checks through a disposable QCOW2 overlay and writes a versioned evidence
+manifest without changing the base image. The resulting image remains a
+development artifact, not a published or publishable image bundle.
 
 ## Motivation
 
@@ -100,8 +102,35 @@ answer file, driver log, independent install and boot transcripts, final
 `qemu-img` metadata and check output, and SHA-256 sums. The final post-validation
 image digest is
 `a2e42e099d65b563c41d54deecfc58354708f712b5fca171429b1a8c419feaac`.
-It remains a local development artifact while manifest generation, reusable
-boot validation, and publication policy are still unimplemented.
+It remains a local development artifact while complete build-manifest
+generation and publication policy are still unimplemented.
+
+### Overlay validation and provenance checkpoint (2026-07-14)
+
+The successful boot checks were then implemented as a reusable internal Linux
+validator. It creates an explicit QCOW2 overlay backed by the candidate image,
+attaches only that overlay to QEMU, runs the deterministic and environmental
+checks, waits for `fshalt`, and removes the overlay after success. A failed or
+interrupted validation retains its overlay and evidence directory for diagnosis.
+
+The first live run completed in approximately 27 seconds. The SHA-256 digest of
+the base image was
+`a2e42e099d65b563c41d54deecfc58354708f712b5fca171429b1a8c419feaac`
+both before and after validation, and an independent post-run hash agreed. The
+overlay was absent after success. The generated evidence directory occupied
+approximately 40 KiB and contained:
+
+- an exact copy and digest of the answer file;
+- the raw serial transcript and structured timestamped events;
+- structured and rendered QEMU commands plus QEMU versions;
+- host, acceleration, and memory details;
+- `qemu-img` metadata and before/after check output;
+- resolved answers and categorized validation checks; and
+- the base-image before/after digests and explicit immutability result.
+
+Deterministic checks fail closed. The DNS/ICMP check is recorded separately as
+environmental and can be optional, required, or skipped. The tool remains an
+internal development interface; the public `p9qemu` CLI is unchanged.
 
 The graphical installer can also be partially recorded with Plan 9 `tee`, but
 it is less suitable for exact automation. `inst/start` uses stderr as its live
@@ -439,12 +468,14 @@ added only after a transport is selected and tested manually.
 3. Completed: build a private Linux-only Pexpect prototype for that exact ISO
    digest and validate it through the first installer menu.
 4. Completed: complete, boot, inspect, and halt a disposable automated image.
-5. Add transcript-driven unit tests and an opt-in Linux integration test.
-6. Decide whether the public interface should be `install --answers` and how
+5. Completed: validate through a disposable overlay and produce a versioned
+   evidence manifest without changing the base image.
+6. Add an opt-in Linux integration test around the live validation tool.
+7. Decide whether the public interface should be `install --answers` and how
    Pexpect is packaged.
-7. Connect the provenance bundle to the downloadable-image release process.
-8. Prototype a portable QEMU serial-socket transport.
-9. Evaluate Pexpect's Windows interfaces and Wexpect only if the portable
+8. Connect complete build provenance to the downloadable-image release process.
+9. Prototype a portable QEMU serial-socket transport.
+10. Evaluate Pexpect's Windows interfaces and Wexpect only if the portable
    transport is insufficient.
 
 ## Relationship to downloadable images

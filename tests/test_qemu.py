@@ -7,6 +7,7 @@ from p9qemu.host import Acceleration
 from p9qemu.qemu import (
     DEFAULT_PORT_FORWARDS,
     build_automated_install_command,
+    build_automated_validation_command,
     build_install_command,
     build_start_command,
     render_command,
@@ -105,6 +106,30 @@ def test_comma_in_console_log_path_is_rejected() -> None:
             memory_mib=1024,
             acceleration=KVM,
         )
+
+
+def test_automated_validation_boots_only_the_overlay_on_logged_serial() -> None:
+    overlay = Path("run") / "validation-overlay.qcow2"
+    console_log = Path("run") / "boot.raw.log"
+    command = build_automated_validation_command(
+        "qemu-system-x86_64",
+        overlay=overlay,
+        console_log=console_log,
+        memory_mib=2048,
+        acceleration=KVM,
+    )
+    assert f"if=none,id=vd0,file={overlay},format=qcow2" in command
+    assert not any("vd1" in argument for argument in command)
+    assert command[-8:] == [
+        "-nographic",
+        "-monitor",
+        "none",
+        "-chardev",
+        f"stdio,id=serial0,logfile={console_log},logappend=off",
+        "-serial",
+        "chardev:serial0",
+        "-no-reboot",
+    ]
 
 
 def test_posix_rendering_is_copyable() -> None:
