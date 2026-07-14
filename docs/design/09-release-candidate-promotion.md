@@ -36,6 +36,8 @@ Promotion fails unless:
 - the source revision is a complete 40-character Git commit;
 - the installation manifest binds that source revision to the supplied answer
   file, verified media, transcript, clean QCOW2, and resulting image digest;
+- the validation manifest records the same source revision, preventing a
+  candidate from mixing installer and validator implementations;
 - the supplied image and answer digests match the validation manifest;
 - validation status is `passed`, every required guest check passed, and no
   validation error was recorded;
@@ -45,7 +47,7 @@ Promotion fails unless:
 - copied public text passes the host-path and common-secret scan.
 
 The required guest checks currently cover serial boot, HJFS root, user, home,
-system name, persistent timezone, an empty stock user home, installed
+system name, persistent timezone, the release-pinned stock user-home inventory, installed
 `plan9.ini`, networking, and orderly shutdown. A result with an optional
 environmental failure is useful diagnostic evidence but is not promotable under
 this first conservative policy.
@@ -66,7 +68,8 @@ of the private source manifest.
 
 Promotion writes an allow-listed public validation manifest. It retains:
 
-- timestamps, p9qemu and QEMU versions, and a limited host description;
+- timestamps, the exact source commit, p9qemu and QEMU versions, and a limited
+  host description;
 - resolved answers and their digest;
 - path-free QCOW2 metadata and the immutable image digest;
 - acceleration, memory, guest checks, and network-check mode; and
@@ -233,6 +236,7 @@ The profile performs no post-install customization. It does not configure a
 password, authentication secret, Drawterm, or any additional remote service.
 The QEMU MAC address is runtime configuration rather than guest-image identity.
 Validation proves that `/adm/timezone/local` matches `/adm/timezone/GMT` and
-that the stock `/usr/glenda` home contains no files. The explicit promotion
-hygiene confirmation remains necessary because those bounded checks cannot
-prove the absence of every possible secret elsewhere in the guest filesystem.
+that `/usr/glenda` contains only the pinned 11554 stock files plus the known
+boot-time temporary patterns. The explicit promotion hygiene confirmation
+remains necessary because those bounded checks cannot prove the absence of
+every possible secret elsewhere in the guest filesystem.

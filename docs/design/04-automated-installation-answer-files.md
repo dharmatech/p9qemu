@@ -476,7 +476,9 @@ added only after a transport is selected and tested manually.
 8. Completed: bind each complete install to the exact source commit, media,
    answers, raw transcript, QEMU versions and command, clean QCOW2 evidence,
    and resulting image digest through a private installation manifest; require
-   and sanitize that manifest during local release-candidate promotion.
+   and sanitize that manifest during local release-candidate promotion. Bind
+   disposable-overlay validation to the same full source commit so promotion
+   cannot mix installer and validator revisions.
 9. Prototype a portable QEMU serial-socket transport.
 10. Evaluate Pexpect's Windows interfaces and Wexpect only if the portable
    transport is insufficient.

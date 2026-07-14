@@ -36,7 +36,15 @@ class FakeTransport:
             "pwd": "/usr/glenda\n",
             "cat /dev/sysname": "cirno",
             "cmp /adm/timezone/US_Pacific /adm/timezone/local": "",
-            "walk -f /usr/glenda": "",
+            "walk -f /usr/glenda": (
+                "/usr/glenda/bin/rc/riostart\n"
+                "/usr/glenda/lib/L.webcookies\n"
+                "/usr/glenda/lib/plumbing\n"
+                "/usr/glenda/lib/profile\n"
+                "/usr/glenda/lib/webcookies\n"
+                "/usr/glenda/tmp/ts.cirno.1\n"
+                "/usr/glenda/tmp/xxx\n"
+            ),
             "9fs 9fat": "",
             "cat /n/9fat/plan9.ini": (
                 "bootargs=local!/dev/sd00/fs -m 147\nvgasize=text\nconsole=0\n"
@@ -68,6 +76,7 @@ def test_profile_is_derived_from_resolved_install_answers() -> None:
     assert validation.home == "/usr/glenda"
     assert validation.system_name == "cirno"
     assert validation.timezone == "US_Pacific"
+    assert "/usr/glenda/lib/profile" in validation.stock_home_files
     assert validation.root_partition == "/dev/sd00/fs"
     assert "console=0" in validation.plan9_ini_values
 
@@ -134,10 +143,10 @@ def test_deterministic_mismatch_fails_closed() -> None:
     assert "fshalt" not in transport.lines
 
 
-def test_nonempty_home_fails_hygiene_check() -> None:
+def test_unexpected_file_fails_stock_home_check() -> None:
     transport = FakeTransport()
-    transport.outputs["walk -f /usr/glenda"] = "/usr/glenda/private.txt\n"
-    with pytest.raises(P9QemuError, match="guest.home-clean.*expected no output"):
+    transport.outputs["walk -f /usr/glenda"] += "/usr/glenda/private.txt\n"
+    with pytest.raises(P9QemuError, match="guest.home-baseline.*private.txt"):
         drive_guest_validation(
             transport,
             profile(),
@@ -145,6 +154,34 @@ def test_nonempty_home_fails_hygiene_check() -> None:
             progress=lambda _message: None,
         )
     assert "fshalt" not in transport.lines
+
+
+def test_missing_stock_file_fails_stock_home_check() -> None:
+    transport = FakeTransport()
+    transport.outputs["walk -f /usr/glenda"] = transport.outputs[
+        "walk -f /usr/glenda"
+    ].replace("/usr/glenda/lib/profile\n", "")
+    with pytest.raises(P9QemuError, match="guest.home-baseline.*lib/profile"):
+        drive_guest_validation(
+            transport,
+            profile(),
+            network_mode="skip",
+            progress=lambda _message: None,
+        )
+
+
+def test_serial_echo_is_ignored_but_command_output_is_not() -> None:
+    transport = FakeTransport()
+    command = "cmp /adm/timezone/US_Pacific /adm/timezone/local"
+    transport.outputs[command] = command + "\n"
+    result = drive_guest_validation(
+        transport,
+        profile(),
+        network_mode="skip",
+        progress=lambda _message: None,
+    )
+    timezone = next(check for check in result.checks if check.name == "guest.timezone")
+    assert timezone.status == "passed"
 
 
 class FailingChild:

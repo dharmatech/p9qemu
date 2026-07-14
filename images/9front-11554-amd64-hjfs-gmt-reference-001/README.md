@@ -13,6 +13,6 @@ or other additional remote services, and it has no post-install customization
 stage.
 
 Before promotion, disposable-overlay validation must confirm the expected
-user, home, system name, persistent timezone, empty stock home directory,
+user, home, system name, persistent timezone, the pinned stock home-file baseline,
 installed `plan9.ini`, required network response, and orderly shutdown. The
 QEMU MAC address remains runtime configuration and is not stored in the image.

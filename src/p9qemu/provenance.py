@@ -265,6 +265,7 @@ def build_validation_manifest(
     status: str,
     started_at: str,
     completed_at: str,
+    source_commit: str,
     answers: InstallAnswers,
     answers_sha256: str,
     base_image: Path,
@@ -299,7 +300,7 @@ def build_validation_manifest(
         "status": status,
         "started_at": started_at,
         "completed_at": completed_at,
-        "p9qemu": {"version": __version__},
+        "p9qemu": {"version": __version__, "commit": source_commit},
         "answers": {
             "sha256": answers_sha256,
             "resolved": asdict(answers),
