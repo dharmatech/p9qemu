@@ -17,6 +17,31 @@ user, home, system name, persistent timezone, the pinned stock home-file baselin
 installed `plan9.ini`, required network response, and orderly shutdown. The
 QEMU MAC address remains runtime configuration and is not stored in the image.
 
+## Runtime boot profile
+
+The automated installation deliberately leaves the installed `plan9.ini` in
+the serial-console form used to build and validate the image: `console=0`,
+`vgasize=text`, `monitor=ask`, and `mouseport=ask`. Consequently, an ordinary
+`p9qemu start` reaches a usable text terminal rather than Rio. This is part of
+the immutable candidate identified below, not a Windows or WHPX failure.
+
+Rio can be tested without changing the base image by interrupting 9boot and
+applying these temporary settings:
+
+```text
+clear console
+mouseport=ps2
+monitor=vesa
+vgasize=1024x768x16
+boot
+```
+
+The publication workflow must make an explicit product decision before using
+this profile as a general ready-to-run image: either describe it as
+console-first, or produce and separately identify a graphical-default image.
+Changing `plan9.ini` would create a different image digest and therefore a new
+candidate; the retained candidate must not be edited in place.
+
 ## Local candidate checkpoint
 
 A fresh build from source commit
@@ -31,4 +56,12 @@ The resulting local-only identity is
 The 250,532,383-byte tar-gzip SHA-256 is
 `b9b778a2fe3ebbd8495d026d6ca4d1d4b73d7d422327dad58d3024a756b7e10d`.
 These values identify a retained local candidate, not a published release
-asset. Windows testing of the exact candidate remains outstanding.
+asset.
+
+The exact archive subsequently passed native Windows 11 testing with QEMU
+10.2.0 and the p9qemu WHPX profile (`kernel-irqchip=off` plus SDL). The default
+boot reached the expected text terminal, where `glenda`, `cirno`,
+`/usr/glenda`, GMT, HJFS, networking, and orderly shutdown were confirmed. A
+second boot with the temporary graphical settings above reached Rio and was
+fast and responsive. Both the base and writable test copy passed `qemu-img
+check` afterward, and the read-only base retained the SHA-256 recorded above.

@@ -296,6 +296,47 @@ The Windows free-space postflight was 173,548,670,976 bytes. The Ubuntu WSL
 VHDX remained 219,465,908,224 bytes, WSL reported 886,240,436,224 bytes
 available, the authoritative run occupied approximately 1.3 GiB, and the
 retained diagnostic evidence occupied 164 KiB. No `.part` file or validation
-overlay remained. This is still a local-only candidate: nothing was uploaded,
-and Windows boot testing of the exact candidate remains a separate publication
-gate.
+overlay remained. This is still a local-only candidate: nothing was uploaded.
+
+#### Exact-candidate Windows WHPX gate (2026-07-14)
+
+The exact 250,532,383-byte archive was copied from the authoritative WSL run to
+a dedicated native-Windows test directory. Its SHA-256 matched
+`b9b778a2fe3ebbd8495d026d6ca4d1d4b73d7d422327dad58d3024a756b7e10d`
+before extraction. The extracted manifest and QCOW2 matched their recorded
+digests, and `qemu-img check` found no errors. The base was then marked
+read-only and a separate writable copy was used for both boots.
+
+The dry run from the current project checkout selected the exact working copy
+and rendered `-accel whpx,kernel-irqchip=off -display sdl`, with no silent TCG
+fallback. Native Windows 11 and QEMU 10.2.0 then produced these results:
+
+| Check | Result |
+| --- | --- |
+| Default boot | Passed as the profile's expected text-console boot |
+| User, system, and home | `glenda`, `cirno`, and `/usr/glenda` |
+| Persistent timezone | `/adm/timezone/local` matched `/adm/timezone/GMT`; `date` reported GMT |
+| Networking | `ip/ping -n 1 google.com` received a reply |
+| Installed boot settings | `mouseport=ask`, `monitor=ask`, `vgasize=text`, and `console=0` |
+| Temporary graphical boot | `clear console`, `mouseport=ps2`, `monitor=vesa`, and `vgasize=1024x768x16` reached Rio |
+| WHPX graphical behavior | Boot and Rio were fast and responsive with SDL |
+| Shutdown | `fshalt` completed and QEMU exited; forwarding ports were released |
+| Postflight integrity | Both QCOW2 files passed `qemu-img check`; the read-only base digest was unchanged |
+
+The first boot also exposed a release-contract gap rather than an acceleration
+failure. The answer-driven installer intentionally persists a console-oriented
+`plan9.ini`, so a plain `p9qemu start` does not open Rio by default. Temporary
+9boot overrides prove that the same guest and WHPX profile support Rio, but
+they are not the intended one-command onboarding experience. Promotion of a
+general ready-to-run graphical image should therefore require one of two
+explicit outcomes:
+
+1. label and document this immutable candidate as console-first; or
+2. create a new, separately identified candidate whose recorded release
+   preparation sets graphical boot defaults, then repeat Linux and Windows
+   clean-room tests against its exact archive.
+
+The existing candidate must not be modified in place because its image and
+archive digests are already part of the provenance record. Windows free space
+after the test was 172,179,492,864 bytes, and the Ubuntu WSL VHDX remained
+219,465,908,224 bytes.
