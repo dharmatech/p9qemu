@@ -32,7 +32,7 @@ from p9qemu.qemu import DEFAULT_PORT_FORWARDS, build_start_command, render_comma
 _IDENTIFIER = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _HOST_PATH_PATTERNS = (
-    re.compile(r"(?i)\b[a-z]:[\\/](?:users|home)[\\/][^\\/\s]+"),
+    re.compile(r"(?i)\b[a-z]:(?:\\{1,2}|/)(?:users|home)(?:\\{1,2}|/)[^\\/\s]+"),
     re.compile(r"/(?:home|users)/[^/\s]+"),
     re.compile(r"(?i)/mnt/[a-z]/users/[^/\s]+"),
 )
@@ -41,7 +41,10 @@ _SECRET_PATTERNS = (
     re.compile(r"\bgithub_pat_[A-Za-z0-9_]+\b"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9_]+\b"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),
-    re.compile(r"(?i)\b(?:password|passwd|token|secret|api[_-]?key)\b\s*[:=]\s*[^\s]+"),
+    re.compile(
+        r"""(?ix)["']?\b(?:pass|password|passwd|token|secret|api[_-]?key)\b["']?"""
+        r"""\s*[:=]\s*["']?[^\s"',}]+"""
+    ),
 )
 _PUBLIC_VALIDATION_ARTIFACTS = {
     "console_log": "validation/boot.raw.log",
@@ -642,9 +645,11 @@ def verify_extracted_bundle(bundle: Path) -> dict[str, object]:
         path = bundle.joinpath(*relative.parts)
         if not path.is_file():
             raise P9QemuError(f"release artifact is missing after extraction: {path}")
-        if path.stat().st_size != record.get("size"):
+        expected_size = record.get("size")
+        if type(expected_size) is not int or path.stat().st_size != expected_size:
             raise P9QemuError(f"release artifact size mismatch: {relative_text}")
-        if sha256_file(path) != record.get("sha256"):
+        expected_sha256 = _string(record.get("sha256"), f"artifacts.{label}.sha256")
+        if sha256_file(path) != expected_sha256:
             raise P9QemuError(f"release artifact checksum mismatch: {relative_text}")
         expected_paths.add(relative.as_posix())
     actual_paths = {

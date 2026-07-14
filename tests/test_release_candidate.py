@@ -187,7 +187,10 @@ def test_source_commit_must_be_complete_and_immutable() -> None:
     [
         "file=/home/alice/private/disk.qcow2\n",
         r"file=C:\Users\alice\private\disk.qcow2",
+        r'{"path":"C:\\Users\\alice\\private\\disk.qcow2"}',
         "token=github_pat_examplevalue\n",
+        '{"password": "not-public"}\n',
+        "PASS=cleartext\n",
         "-----BEGIN PRIVATE KEY-----\n",
     ],
 )
