@@ -32,6 +32,10 @@ def test_parser_defaults() -> None:
     assert install.disk_size == "30G"
     assert install.memory == 1024
     assert install.accel == "auto"
+    assert install.iso_url == (
+        "https://github.com/dharmatech/p9qemu/releases/download/"
+        "media-9front-11554/9front-11554.amd64.iso.gz"
+    )
 
     start = cli.build_parser().parse_args(["start"])
     assert start.disk == Path("9front.qcow2.img")
@@ -55,7 +59,10 @@ def test_install_dry_run_has_no_side_effects_and_prints_command(
     assert not cache.exists()
     assert not (instance / "9front.qcow2.img").exists()
     output = capsys.readouterr().out
-    assert "Would download " in output
+    assert (
+        "Would download https://github.com/dharmatech/p9qemu/releases/download/"
+        "media-9front-11554/9front-11554.amd64.iso.gz" in output
+    )
     assert "Would create 30G QCOW2 disk image" in output
     assert "Would start QEMU:" in output
     assert "'-drive'" not in output

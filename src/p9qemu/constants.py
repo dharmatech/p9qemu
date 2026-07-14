@@ -9,8 +9,8 @@ DEFAULT_START_MEMORY_MIB = 2048
 DEFAULT_MAC_ADDRESS = "00:20:91:37:33:77"
 
 DEFAULT_ISO_URL = (
-    "https://github.com/dharmatech/9front-notes/releases/download/"
-    "v0.0.1/9front-11554.amd64.iso.gz"
+    "https://github.com/dharmatech/p9qemu/releases/download/"
+    "media-9front-11554/9front-11554.amd64.iso.gz"
 )
 DEFAULT_ARCHIVE_NAME = "9front-11554.amd64.iso.gz"
 DEFAULT_ISO_NAME = "9front-11554.amd64.iso"

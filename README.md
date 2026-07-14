@@ -37,10 +37,8 @@ Install the current GitHub version as an isolated command-line tool:
 $ uv tool install git+https://github.com/dharmatech/p9qemu.git
 ```
 
-The repository is private during early development, so this currently requires
-repository access. It will become a one-command public installation when the
-repository is opened. A future package release will support the shorter
-`uv tool install p9qemu` form.
+The repository is public, so the command does not require GitHub credentials. A
+future package release will support the shorter `uv tool install p9qemu` form.
 
 If uv reports that its tool directory is not on `PATH`, run:
 
@@ -90,8 +88,12 @@ Useful installer options include:
 --quiet           Suppress routine p9qemu output
 ```
 
-The built-in archive is pinned to the SHA-256 digest published in its GitHub
-release metadata. An overridden URL without `--iso-sha256` produces a warning.
+The built-in archive comes from the public
+[`media-9front-11554`](https://github.com/dharmatech/p9qemu/releases/tag/media-9front-11554)
+prerelease and is pinned to its SHA-256 digest. Its upstream origin, compressed
+and decompressed checksums, and distribution details are recorded in the
+[`9front-11554-amd64` media manifest](media/9front-11554-amd64/media-manifest.json).
+An overridden URL without `--iso-sha256` produces a warning.
 
 ## Start an installed VM
 
