@@ -79,3 +79,61 @@ def prepare_disk(
         raise P9QemuError(f"could not run {qemu_img}: {error}") from error
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def prepare_validation_overlay(
+    qemu_img: str,
+    base: Path,
+    overlay: Path,
+    *,
+    progress: Progress,
+    runner: Runner = subprocess.run,
+) -> None:
+    """Create a new QCOW2 overlay without modifying its base image."""
+
+    if not base.is_file():
+        raise P9QemuError(f"validation base image is not a file: {base}")
+    if overlay.exists():
+        raise P9QemuError(f"refusing to replace validation overlay: {overlay}")
+    if not overlay.parent.is_dir():
+        raise P9QemuError(
+            f"validation overlay parent directory does not exist: {overlay.parent}"
+        )
+    if base.resolve() == overlay.resolve():
+        raise P9QemuError("validation overlay must differ from its base image")
+
+    temporary = overlay.with_name(f".{overlay.name}.p9qemu-{uuid4().hex}.part")
+    command = [
+        qemu_img,
+        "create",
+        "-f",
+        "qcow2",
+        "-F",
+        "qcow2",
+        "-b",
+        str(base.resolve()),
+        str(temporary),
+    ]
+    progress(f"Creating disposable QCOW2 validation overlay: {overlay}")
+    try:
+        result = runner(command, check=False)
+        if result.returncode != 0:
+            raise P9QemuError(
+                f"qemu-img overlay creation exited with status {result.returncode}"
+            )
+        if not temporary.is_file():
+            raise P9QemuError("qemu-img did not create the validation overlay")
+        try:
+            os.link(temporary, overlay)
+        except FileExistsError as error:
+            raise P9QemuError(
+                f"refusing to replace validation overlay created concurrently: {overlay}"
+            ) from error
+        except OSError as error:
+            raise P9QemuError(
+                f"could not publish validation overlay {overlay}: {error}"
+            ) from error
+    except OSError as error:
+        raise P9QemuError(f"could not run {qemu_img}: {error}") from error
+    finally:
+        temporary.unlink(missing_ok=True)

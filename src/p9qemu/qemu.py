@@ -144,6 +144,39 @@ def build_automated_install_command(
     ]
 
 
+def build_automated_validation_command(
+    executable: str,
+    *,
+    overlay: Path,
+    console_log: Path,
+    memory_mib: int,
+    acceleration: Acceleration,
+    mac_address: str = DEFAULT_MAC_ADDRESS,
+) -> list[str]:
+    """Build the dedicated-serial command for disposable-overlay validation."""
+
+    log_value = _option_path(console_log, "console log", "-chardev")
+    return [
+        *_base_command(
+            executable,
+            memory_mib=memory_mib,
+            acceleration=acceleration,
+            mac_address=mac_address,
+        ),
+        "-net",
+        "user",
+        *_disk_arguments(overlay),
+        "-nographic",
+        "-monitor",
+        "none",
+        "-chardev",
+        f"stdio,id=serial0,logfile={log_value},logappend=off",
+        "-serial",
+        "chardev:serial0",
+        "-no-reboot",
+    ]
+
+
 def build_start_command(
     executable: str,
     *,
