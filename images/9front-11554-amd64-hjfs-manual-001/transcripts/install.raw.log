@@ -1,0 +1,470 @@
+c[?7l[2J[0mSeaBIOS (version 1.15.0-1)
+
+
+iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+3FF8B2B0+3FECB2B0 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...                                                                               
+
+
+Booting from DVD/CD...
+ *e820=1 0x0000000000000000 0x000000000009fc00 2 0x000000000009fc00 0x00000000000
+a0000 2 0x00000000000f0000 0x0000000000100000 1 0x0000000000100000 0x000000003ff
+dd000 2 0x000000003ffdd000 0x0000000040000000 2 0x00000000feffc000 0x00000000ff0
+00000 2 0x00000000fffc0000 0x0000000100000000 
+cdboot=yes
+mouseport=ask
+monitor=ask
+vgasize=ask
+bootfile=/amd64/9pc64
+>console=0
+ccoonnssoollee==0
+0
+>>bboooott⌂⌂⌂⌂⌂⌂⌂⌂⌂
+
+>>bboooott
+
+    11  11111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666  777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999bboooot
+
+Plan 9
+HPET: fed00000 8086a201 100 MHz 
+125 holes free
+0x00022000 0x0009f000 512000
+0x00100000 0x00110000 65536
+0x0060d000 0x19cd9000 426557440
+427134976 bytes free
+pcirouting: PCI.0.1.3 at pin 1 link 60 irq 9 -> 10
+cpu0: 2411MHz GenuineIntel Xeon5000-series (AX 000A0652 CX F7FAB223 DX 0F8BFBFF)
+LAPIC: fee00000 0xfffffe80fee00000
+ELCR: 0C00
+cpu0: lapic clock at 999MHz
+#l0: virtio: 1000Mbps port 0xC040 irq 11 ea 002091373377
+1000M memory: 413M kernel data, 587M user, 1837M swap
+pc64.bootfs: Sat Jan 24 08:06:40 GMT 2026
+fingerprint: 66716f66bf5d84939d54be745e868d22ade518ab
+nusb/usbd: no hubs
+
+/dev/sd00: QEMU QEMU HARDDISK 2.5+
+/dev/sd00/data	
+/dev/sd01: QEMU QEMU CD-ROM 2.5+
+/dev/sd01/data	 9660
+bootargs is (tcp, tls, il, local!device)[local!/dev/sd01/data] 
+user[glenda]: 
+
+init: starting /bin/rc
+cirno Jul 13 17:46:09 starting dns resolver on /net
+vgasize is (text, 640x480x8, 1024x768x16, ...) [1024x768x16] text
+bind: #i: no frame buffer
+
+rio: can't open display: initdisplay: /dev/draw/new: file does not exist: '/dev/draw'
+init: rc exit status: rc 216: rio 345: display open
+
+init: starting /bin/rc
+term% term% 
+term% 
+term% 
+term% 
+term% 
+term% inst/start
+Mon Jul 13 15:46:36 CET 2026 Installation process started
+
+--------------------------------------
+
+Preparing menu...
+The following unfinished tasks are ready to be done:
+	configfs	- choose the type of file system to install
+	confignet	- configure the network
+	tzsetup	- choose time zone
+
+Task to do [configfs]: 
+
+--------------------------------------
+You can install the following types of file systems:
+
+	cwfs64x	cached-worm file server for large disks
+	hjfs	file server for small disks
+	gefs	good enough file system (experimental!)
+
+File system (cwfs64x, hjfs, gefs)[cwfs64x]: hjfs
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+
+The following unfinished tasks are ready to be done:
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	tzsetup	- choose time zone
+
+Task to do [partdisk]: 
+
+--------------------------------------
+The following disk devices were found.
+
+sd00 - QEMU QEMU HARDDISK 2.5+
+
+sd01 - QEMU QEMU CD-ROM 2.5+
+   empty                0 467       (467 cylinders, 1.82 GB) 
+ * p1                 467 468       (1 cylinders, 4.00 MB) ESP
+
+Disk to partition (sd00, sd01)[no default]: sd00
+The disk you selected HAS NO master boot record on its first sector.
+(Perhaps it is a completely blank disk.)
+Shall we create a blank EFI partition table (GPT)
+or install traditional DOS partition table (MBR)?
+
+Install mbr or gpt (mbr, gpt)[no default]: mbr
+
+This is disk/fdisk; use it to create a Plan 9 partition.
+If there is enough room, a Plan 9 partition will be
+suggested; you can probably just type 'w' and then 'q'.
+
+cylinder = 8225280 bytes
+'* p1                     0 3916        (3916 cylinders, 29.99 GB) PLAN9
+>>> w
+>>> q
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+
+The following unfinished tasks are ready to be done:
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	tzsetup	- choose time zone
+
+Task to do [prepdisk]: 
+
+--------------------------------------
+The following Plan 9 disk partitions were found.
+
+/dev/sd00/plan9
+  empty                  0 62910477    (62910477 sectors, 29.99 GB)
+
+Plan 9 partition to subdivide (/dev/sd00/plan9)[/dev/sd00/plan9]: 
+This is disk/prep; use it to subdivide the Plan 9 partition.
+If it is not yet subdivided, a sensible layout will be suggested;
+you can probably just type 'w' and then 'q'.
+
+no plan9 partition table found
+9fat 204800
+nvram 1
+fs 62705676
+' 9fat                   0 204800      (204800 sectors, 100.00 MB)
+' nvram             204800 204801      (1 sectors, 512 B )
+' fs                204801 62910477    (62705676 sectors, 29.90 GB)
+>>> w
+>>> q
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+
+The following unfinished tasks are ready to be done:
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	tzsetup	- choose time zone
+
+Task to do [mountfs]: 
+
+--------------------------------------
+
+Please choose your hjfs partition
+
+--rw-r----- S 0 glenda glenda 32105306112 Jan 24 09:06 /dev/sd00/fs
+
+Hjfs partition (/dev/sd00/fs)[/dev/sd00/fs]: 
+Size of RAM filesystem cache (MB)? [147]: 
+Ream the filesystem? (yes, no)[yes]: 
+Starting hjfs file server for /dev/sd00/fs
+hjfs: reaming /dev/sd00/fs
+hjfs: ream successful
+hjfs: fs is /dev/sd00/fs
+Configuring hjfs file server for /dev/sd00/fs
+hjfs: >create /dist sys sys 775 d
+hjfs: >create /usr sys sys 775 d
+hjfs: >newuser glenda
+hjfs: >newuser adm +glenda
+hjfs: >newuser sys +glenda
+hjfs: >newuser upas +glenda
+hjfs: >echo off
+Mounting hjfs file server for /dev/sd00/fs
+% mount -c /srv/hjfs.newfs /n/newfs
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+
+The following unfinished tasks are ready to be done:
+	confignet	- configure the network
+	mountdist	- locate and mount the distribution
+	tzsetup	- choose time zone
+
+Task to do [confignet]: 
+
+--------------------------------------
+
+We will configure the ethernet.
+
+
+Please choose a method for configuring your ethernet connection.
+
+	manual - specify IP address, network mask, gateway IP address
+	automatic - use DHCP and SLAAC to automatically configure
+
+Configuration method (manual, automatic)[automatic]: 
+starting ethernet automatic config
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+
+The following unfinished tasks are ready to be done:
+	mountdist	- locate and mount the distribution
+	tzsetup	- choose time zone
+
+Task to do [mountdist]: 
+
+--------------------------------------
+Please wait... Scanning storage devices...
+	/dev/sd00/9fat
+	/dev/sd00/data
+	/dev/sd00/fs
+	/dev/sd01/data
+
+The following storage media were detected.
+Choose the one containing the distribution.
+
+	/dev/sd01/data (iso9660 cdrom)
+
+Distribution disk (/dev/sd01/data, /dev/sd00/fs, /)[/]: /dev/sd01/data
+% 9660srv
+9660srv 1990: serving /srv/9660
+% mount /srv/9660 /n/distmedia /dev/sd01/data
+
+Which directory contains the distribution?
+
+Location of archives [/]: 
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	mountdist	- locate and mount the distribution
+
+The following unfinished tasks are ready to be done:
+	copydist	- copy the distribution into the file system
+	tzsetup	- choose time zone
+
+Task to do [copydist]: 
+
+--------------------------------------
+processing /sys/lib/sysconfig/proto/allproto
+file system made
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	mountdist	- locate and mount the distribution
+	copydist	- copy the distribution into the file system
+
+The following unfinished tasks are ready to be done:
+	ndbsetup	- setup network configuration
+	tzsetup	- choose time zone
+	bootsetup	- configure hard disk to boot plan 9
+
+Task to do [ndbsetup]: 
+
+--------------------------------------
+
+Setup network configuration
+
+sysname [cirno]: 
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	mountdist	- locate and mount the distribution
+	copydist	- copy the distribution into the file system
+	ndbsetup	- setup network configuration
+
+The following unfinished tasks are ready to be done:
+	tzsetup	- choose time zone
+	bootsetup	- configure hard disk to boot plan 9
+
+Task to do [tzsetup]: 
+
+--------------------------------------
+
+Setup Time Zone
+
+Time Zone (Argentina, Asia_Bahrain, Asia_India, Asia_Jakarta, Asia_Jayapura, Asia_Makassar, Asia_Pontianak, Australia_ACT, Australia_Broken-Hill, Australia_LHI, Australia_NSW, Australia_North, Australia_Queensland, Australia_South, Australia_Sturt, Australia_Tasmania, Australia_Victoria, Australia_West, Australia_Yancowinna, Brazil_Acre, Brazil_DeNoronha, Brazil_East, Brazil_West, CET, Canada_Atlantic, Canada_Central, Canada_East-Saskatchewan, Canada_Eastern, Canada_Mountain, Canada_Newfoundland, Canada_Pacific, Canada_Yukon, Chile_Continental, Chile_EasterIsland, Cuba, EET, Egypt, GB-Eire, GMT, HST, Hongkong, Iceland, Iran, Israel, Jamaica, Japan, Libya, Mexico_BajaNorte, Mexico_BajaSur, Mexico_General, NZ, NZ_CHAT, Navajo, PRC, Poland, ROC, ROK, Singapore, Turkey, US_Alaska, US_Arizona, US_Central, US_East-Indiana, US_Eastern, US_Hawaii, US_Michigan, US_Mountain, US_Pacific, US_Yukon, Uruguay, W-SU, WET)[US_Eastern]: 
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	mountdist	- locate and mount the distribution
+	copydist	- copy the distribution into the file system
+	ndbsetup	- setup network configuration
+	tzsetup	- choose time zone
+
+The following unfinished tasks are ready to be done:
+	bootsetup	- configure hard disk to boot plan 9
+
+Task to do [bootsetup]: tzsetup
+
+--------------------------------------
+
+Setup Time Zone
+
+Time Zone (Argentina, Asia_Bahrain, Asia_India, Asia_Jakarta, Asia_Jayapura, Asia_Makassar, Asia_Pontianak, Australia_ACT, Australia_Broken-Hill, Australia_LHI, Australia_NSW, Australia_North, Australia_Queensland, Australia_South, Australia_Sturt, Australia_Tasmania, Australia_Victoria, Australia_West, Australia_Yancowinna, Brazil_Acre, Brazil_DeNoronha, Brazil_East, Brazil_West, CET, Canada_Atlantic, Canada_Central, Canada_East-Saskatchewan, Canada_Eastern, Canada_Mountain, Canada_Newfoundland, Canada_Pacific, Canada_Yukon, Chile_Continental, Chile_EasterIsland, Cuba, EET, Egypt, GB-Eire, GMT, HST, Hongkong, Iceland, Iran, Israel, Jamaica, Japan, Libya, Mexico_BajaNorte, Mexico_BajaSur, Mexico_General, NZ, NZ_CHAT, Navajo, PRC, Poland, ROC, ROK, Singapore, Turkey, US_Alaska, US_Arizona, US_Central, US_East-Indiana, US_Eastern, US_Hawaii, US_Michigan, US_Mountain, US_Pacific, US_Yukon, Uruguay, W-SU, WET)[US_Eastern]: US_Pacific
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	mountdist	- locate and mount the distribution
+	copydist	- copy the distribution into the file system
+	ndbsetup	- setup network configuration
+	tzsetup	- choose time zone
+
+The following unfinished tasks are ready to be done:
+	bootsetup	- configure hard disk to boot plan 9
+
+Task to do [bootsetup]: 
+
+--------------------------------------
+
+Setup Plan 9 FAT boot partition (9fat)
+
+Plan 9 FAT partition (/dev/sd00/9fat)[/dev/sd00/9fat]: 
+dossrv: serving /srv/dos
+% dd -bs 512 -count 1 -if /dev/sd00/9fat -of /tmp/pbs.bak
+1+0 records in
+1+0 records out
+Initializing Plan 9 FAT partition.
+% disk/format -r 2 -d -b /386/pbs -l PLAN9 /dev/sd00/9fat
+Initializing FAT file system
+type hard, 12 tracks, 255 heads, 63 sectors/track, 512 bytes/sec
+used 4096 bytes
+% mount -c /srv/dos /n/9fat /dev/sd00/9fat
+% rm -f /n/9fat/9bootfat
+% cp /386/9bootfat /n/9fat/9bootfat
+% chmod +al /n/9fat/9bootfat
+% rm -f /n/9fat/plan9.ini
+% cp /tmp/plan9.ini /n/9fat/plan9.ini
+% rm -f /n/9fat/9pc64
+% cp /amd64/9pc64 /n/9fat/9pc64
+% mkdir -p /n/9fat/efi/boot
+% cp /386/bootia32.efi /n/9fat/efi/boot/
+% mkdir -p /n/9fat/efi/boot
+% cp /386/bootx64.efi /n/9fat/efi/boot/
+% cp /tmp/pbs.bak /n/9fat
+% unmount /n/9fat
+
+If you use the Windows NT/2000/XP master boot record
+or a master boot record from a Unix clone (e.g., LILO or
+FreeBSD bootmgr), it is probably safe to continue using
+that boot record rather than install the Plan 9 boot record.
+
+Install the Plan 9 master boot record (yes, no)[no default]: yes
+Mark the Plan 9 partition active (yes, no)[no default]: yes
+
+The Plan 9 partition is now marked as active.
+
+--------------------------------------
+
+Preparing menu...
+The following tasks are done: 
+	configfs	- choose the type of file system to install
+	partdisk	- edit partition tables (e.g., to create a plan 9 partition)
+	prepdisk	- subdivide plan 9 disk partition
+	mountfs	- choose and mount file system partition
+	confignet	- configure the network
+	mountdist	- locate and mount the distribution
+	copydist	- copy the distribution into the file system
+	ndbsetup	- setup network configuration
+	tzsetup	- choose time zone
+	bootsetup	- configure hard disk to boot plan 9
+
+The following unfinished tasks are ready to be done:
+	finish	- finish the installation and reboot
+
+Task to do [finish]: 
+
+--------------------------------------
+Congratulations; you've completed the install.
+
+
+halting...hjfs: ending
+/srv/hjfs.newfs.cmd...
+done halting
+echo: write error: device or object already in use
+rebooting...
+cpu0: exiting
+c[?7l[2J[0mSeaBIOS (version 1.15.0-1)
+
+
+iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+3FF8B2B0+3FECB2B0 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...                                                                               
+
+
+Booting from DVD/CD...
+ *e820=1 0x0000000000000000 0x000000000009fc00 2 0x000000000009fc00 0x00000000000
+a0000 2 0x00000000000f0000 0x0000000000100000 1 0x0000000000100000 0x000000003ff
+dd000 2 0x000000003ffdd000 0x0000000040000000 2 0x00000000feffc000 0x00000000ff0
+00000 2 0x00000000fffc0000 0x0000000100000000 
+cdboot=yes
+mouseport=ask
+monitor=ask
+vgasize=ask
+bootfile=/amd64/9pc64
+  1 1112233445566778899aabbccddeeff00112233445566 778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899boo

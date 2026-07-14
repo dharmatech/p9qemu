@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "kind": "installation-media",
+  "id": "9front-11554-amd64",
+  "relationship": "unmodified-upstream-mirror",
+  "upstream": {
+    "project": "9front",
+    "release": "11554",
+    "architecture": "amd64",
+    "project_url": "https://9front.org/",
+    "archive_url": "https://9front.org/iso/9front-11554.amd64.iso.gz"
+  },
+  "artifacts": [
+    {
+      "role": "compressed-installer",
+      "filename": "9front-11554.amd64.iso.gz",
+      "media_type": "application/gzip",
+      "compression": "gzip",
+      "size": 243859187,
+      "sha256": "5aaf54327b4bb73a17e192488dc3e65d9d8e526728732e2fdf402bccb8c60236",
+      "publish": true,
+      "content_modified": false
+    },
+    {
+      "role": "installation-iso",
+      "filename": "9front-11554.amd64.iso",
+      "media_type": "application/x-iso9660-image",
+      "size": 491550720,
+      "sha256": "1dcfbb3ec221307329545a37d1562beeea1f4174f6df80d245e0a222893b3bb6",
+      "publish": false,
+      "derived_from": "9front-11554.amd64.iso.gz",
+      "derivation": "gzip-decompression"
+    }
+  ],
+  "distribution": {
+    "repository": "https://github.com/dharmatech/p9qemu",
+    "release_tag": "media-9front-11554",
+    "release_title": "9front 11554 AMD64 installation media",
+    "asset_filename": "9front-11554.amd64.iso.gz",
+    "asset_url": "https://github.com/dharmatech/p9qemu/releases/download/media-9front-11554/9front-11554.amd64.iso.gz",
+    "checksum_asset": "SHA256SUMS",
+    "manifest_asset": "media-manifest.json"
+  },
+  "verification": {
+    "verified_on": "2026-07-13",
+    "checksum_algorithm": "sha256",
+    "checksum_file": "SHA256SUMS",
+    "verified_forms": [
+      "compressed-installer",
+      "installation-iso"
+    ]
+  },
+  "licensing": {
+    "summary": "9front is provided under the MIT License unless otherwise indicated; notices included in the media apply.",
+    "notice_path_in_media": "/lib/legal/NOTICE",
+    "mit_license_path_in_media": "/lib/legal/mit",
+    "fqa_reference": "https://fqa.9front.org/fqa0.html#0.2.4"
+  }
+}

@@ -1,0 +1,5 @@
+# Image and installation-media binaries belong in release assets or local
+# build directories, never in Git history.
+*.img*
+*.qcow2*
+*.iso*

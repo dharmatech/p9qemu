@@ -1,0 +1,3 @@
+No errors were found on the image.
+8524/491520 = 1.73% allocated, 1.99% fragmented, 0.00% compressed clusters
+Image end offset: 559022080

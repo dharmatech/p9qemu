@@ -1,0 +1,95 @@
+c[?7l[2J[0mSeaBIOS (version 1.15.0-1)
+
+
+iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+7FF8B2B0+7FECB2B0 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...                                                                               
+
+
+Booting from Hard Disk...
+MBR...pbs.................ok
+    *e820=1 0x0000000000000000 0x000000000009fc00 2 0x000000000009fc00 0x00000000000
+a0000 2 0x00000000000f0000 0x0000000000100000 1 0x0000000000100000 0x000000007ff
+dd000 2 0x000000007ffdd000 0x0000000080000000 2 0x00000000feffc000 0x00000000ff0
+00000 2 0x00000000fffc0000 0x0000000100000000 
+bootfile=9pc64
+bootargs=local!/dev/sd00/fs -m 147
+mouseport=ask
+monitor=ask
+vgasize=text
+ccoonnssoollee==0
+0
+                11  11111111111111111122222222222222223333333333333333444444444444444455555555555555556666666666666666777777777777777788888888888888889999999999999999aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbccccccccccccccccddddddddddddddddeeeeeeeeeeeeeeeeffffffffffffffff0000000000000000111111111111111122222222222222223333333333333333444444444444444455555555555555556666666666666666  777777777777777788888888888888889999999999999999aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbccccccccccccccccddddddddddddddddeeeeeeeeeeeeeeeeffffffffffffffff0000000000000000111111111111111122222222222222223333333333333333444444444444444455555555555555556666666666666666777777777777777788888888888888889999999999999999aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbccccccccccccccccddddddddddddddddeeeeeeeeeeeeeeeeffffffffffffffff0000000000000000111111111111111122222222222222223333333333333333444444444444444455555555555555556666666666666666777777777777777788888888888888889999999999999999aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbccccccccccccccccddddddddddddddddeeeeeeeeeeeeeeeeffffffffffffffff0000000000000000111111111111111122222222222222223333333333333333444444444444444455555555555555556666666666666666777777777777777788888888888888889999999999999999bboooot
+
+Plan 9
+HPET: fed00000 8086a201 100 MHz 
+125 holes free
+0x00022000 0x0009f000 512000
+0x00100000 0x00110000 65536
+0x0060d000 0x33672000 856051712
+856629248 bytes free
+pcirouting: PCI.0.1.3 at pin 1 link 60 irq 9 -> 10
+cpu0: 2398MHz GenuineIntel Xeon5000-series (AX 000A0652 CX F7FAB223 DX 0F8BFBFF)
+LAPIC: fee00000 0xfffffe80fee00000
+ELCR: 0C00
+cpu0: lapic clock at 1000MHz
+#l0: virtio: 1000Mbps port 0xC040 irq 11 ea 002091373377
+2004M memory: 822M kernel data, 1181M user, 2431M swap
+pc64.bootfs: Sat Jan 24 08:06:40 GMT 2026
+fingerprint: 66716f66bf5d84939d54be745e868d22ade518ab
+nusb/usbd: no hubs
+
+/dev/sd00: QEMU QEMU HARDDISK 2.5+
+/dev/sd00/9fat	 dos
+/dev/sd00/data	
+/dev/sd00/fs	 hjfs
+/dev/sd00/nvram
+/dev/sd00/plan9
+bootargs is (tcp, tls, il, local!device)[local!/dev/sd00/fs -m 147] 
+user[glenda]: 
+hjfs: fs is /dev/sd00/fs
+
+init: starting /bin/rc
+bind: #i: no frame buffer
+rio: can't open display: initdisplay: /dev/draw/new: file does not exist: '/dev/draw'
+init: rc exit status: rc 223: rio 352: display open
+
+init: starting /bin/rc
+term% 9fs 9fat
+term% cd /n/
+term% cd 9fat
+Can't cd 9fat: file does not exist: '9fat'
+term% pwd
+/usr/glenda
+term% lc
+term% 
+term% 
+term% 
+term% cd /n
+term% pwd
+/n
+term% lc
+9/    9fat/
+term% cd 9fat
+term% lc
+9bootfat  9pc64     efi/      pbs.bak   plan9.ini
+term% cd
+term% 
+term% 
+term% cat poa
+term% 
+term% 
+term% cat plan9.ini
+bootfile=9pc64
+bootargs=local!/dev/sd00/fs -m 147
+mouseport=ask
+monitor=ask
+vgasize=text
+console=0
+term% date
+Mon Jul 13 15:58:57 PDT 2026
+term% fshalt
+
+halting...hjfs: ending
+/srv/hjfs.cmd...
+done halting
+echo: write error: device or object already in use
