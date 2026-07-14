@@ -1,0 +1,3 @@
+# Raw QEMU character streams are evidence. Preserve their bytes exactly and
+# do not render their terminal-control sequences as textual diffs.
+*.raw.log binary

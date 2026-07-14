@@ -1,0 +1,4 @@
+# Installation-media binaries are GitHub release assets, not source files.
+*.iso*
+*.img*
+*.qcow2*

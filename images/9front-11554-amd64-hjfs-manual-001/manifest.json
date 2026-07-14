@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "status": "experimental-manual-reference",
+  "build_id": "9front-11554-amd64-hjfs-manual-001",
+  "architecture": "amd64",
+  "source_media": {
+    "id": "9front-11554-amd64",
+    "manifest": "../../media/9front-11554-amd64/media-manifest.json",
+    "archive_sha256": "5aaf54327b4bb73a17e192488dc3e65d9d8e526728732e2fdf402bccb8c60236",
+    "iso_sha256": "1dcfbb3ec221307329545a37d1562beeea1f4174f6df80d245e0a222893b3bb6"
+  },
+  "builder": {
+    "method": "manual-qemu-serial-console",
+    "p9qemu_performed_build": false,
+    "related_p9qemu_commit": "a3688f28144b904d337b156d42c4bf3ef885c0a8"
+  },
+  "host": {
+    "operating_system": "Ubuntu under WSL2",
+    "kernel": "5.15.167.4-microsoft-standard-WSL2",
+    "architecture": "x86_64"
+  },
+  "qemu": {
+    "system_version": "6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.30)",
+    "img_version": "6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.30)",
+    "acceleration": "kvm",
+    "memory_mib": 1024,
+    "command_file": "qemu-command.txt"
+  },
+  "result": {
+    "filename": "9front-console-target.qcow2.img-000-post-install",
+    "committed_to_git": false,
+    "format": "qcow2",
+    "file_size": 559022080,
+    "virtual_size": 32212254720,
+    "sha256": "197ae5efc2dc60a9cc593fad3d407e35d7046824a8fbc201320a9caa6577029e"
+  },
+  "logs": {
+    "install": {
+      "path": "transcripts/install.raw.log",
+      "sha256": "22411d01b01a3bef2c4af0dadee02ebfd0c55e0b8a5281746745dcb7154c8ba0"
+    },
+    "first_boot": {
+      "path": "transcripts/first-boot.raw.log",
+      "sha256": "84d6c0b8fb6ccab63f953b66fe8267f90b66b96329561626cf8e14cedee66f94"
+    },
+    "graphical_boot": {
+      "path": "transcripts/graphical-boot.raw.log",
+      "sha256": "9dd83c9b6614a59e5cf74f8e01b24815e78a3a02758eb66c457cf7534943e1af"
+    }
+  },
+  "validation": {
+    "qemu_img_check": "passed",
+    "serial_boot": "passed",
+    "graphical_boot": "passed-manual-observation",
+    "orderly_shutdown": "passed",
+    "network": "not-recorded-for-this-reference-build"
+  }
+}

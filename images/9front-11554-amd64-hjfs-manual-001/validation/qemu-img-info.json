@@ -1,0 +1,19 @@
+{
+    "virtual-size": 32212254720,
+    "filename": "9front-console-target.qcow2.img-000-post-install",
+    "cluster-size": 65536,
+    "format": "qcow2",
+    "actual-size": 558960640,
+    "format-specific": {
+        "type": "qcow2",
+        "data": {
+            "compat": "1.1",
+            "compression-type": "zlib",
+            "lazy-refcounts": false,
+            "refcount-bits": 16,
+            "corrupt": false,
+            "extended-l2": false
+        }
+    },
+    "dirty-flag": false
+}

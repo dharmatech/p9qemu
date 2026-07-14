@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "image_sha256": "197ae5efc2dc60a9cc593fad3d407e35d7046824a8fbc201320a9caa6577029e",
+  "checks": [
+    {
+      "name": "qemu-img-check",
+      "status": "passed",
+      "evidence": "qemu-img-check.txt"
+    },
+    {
+      "name": "serial-boot",
+      "status": "passed",
+      "evidence": "../transcripts/first-boot.raw.log",
+      "observations": [
+        "MBR and Plan 9 boot sector completed",
+        "HJFS mounted from /dev/sd00/fs",
+        "user glenda reached the shell",
+        "installed plan9.ini was inspected",
+        "date reported PDT after US_Pacific configuration",
+        "fshalt completed"
+      ]
+    },
+    {
+      "name": "graphical-boot",
+      "status": "passed-manual-observation",
+      "evidence": "../transcripts/graphical-boot.raw.log",
+      "observations": [
+        "console=0 was cleared temporarily at 9boot",
+        "mouseport=ps2",
+        "monitor=vesa",
+        "vgasize=1024x768x16",
+        "Rio startup was observed in the QEMU graphical display"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# Reconstructed command for the successful manual console-install experiment.
+# The QEMU argument profile and expanded paths are supported by the transcript
+# and development record; the original host command was not saved separately.
+
+INSTALLER="/home/dharmatech/.cache/p9qemu/9front-11554.amd64.iso"
+TARGET="$PWD/9front-console-target.qcow2.img"
+LOG="$PWD/install.log"
+
+qemu-system-x86_64 \
+    -m 1024 \
+    -cpu host \
+    -accel kvm \
+    -net nic,model=virtio,macaddr=00:20:91:37:33:77 \
+    -net user \
+    -device virtio-scsi-pci,id=scsi \
+    -drive if=none,id=vd0,file="$TARGET",format=qcow2 \
+    -device scsi-hd,drive=vd0 \
+    -drive if=none,id=vd1,file="$INSTALLER",format=raw \
+    -device scsi-cd,drive=vd1,bootindex=0 \
+    -chardev stdio,id=serial0,mux=on,logfile="$LOG",logappend=off \
+    -serial chardev:serial0 \
+    -mon chardev=serial0,mode=readline \
+    -nographic
