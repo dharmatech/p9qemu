@@ -81,9 +81,8 @@ def test_automated_install_has_dedicated_logged_serial_without_monitor() -> None
         memory_mib=1024,
         acceleration=KVM,
     )
-    assert command[-9:] == [
-        "-display",
-        "none",
+    assert command[-8:] == [
+        "-nographic",
         "-monitor",
         "none",
         "-chardev",
@@ -92,7 +91,7 @@ def test_automated_install_has_dedicated_logged_serial_without_monitor() -> None
         "chardev:serial0",
         "-no-reboot",
     ]
-    assert "-nographic" not in command
+    assert "-display" not in command
     assert "mon:stdio" not in command
 
 
