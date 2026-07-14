@@ -28,6 +28,7 @@ from p9qemu.provenance import (
 )
 from p9qemu.qemu import build_automated_validation_command, render_command
 from p9qemu.validation import (
+    GuestValidationError,
     GuestValidationResult,
     NetworkMode,
     build_guest_validation_profile,
@@ -209,6 +210,7 @@ def _run_validation(
     base_sha256_after = base_sha256_before
     overlay_removed = False
     error_text: str | None = None
+    failure_category: str | None = None
     interrupted = False
     status = "failed"
     try:
@@ -233,6 +235,9 @@ def _run_validation(
         status = validation.status
     except (OSError, P9QemuError) as error:
         error_text = str(error)
+        failure_category = (
+            error.category if isinstance(error, GuestValidationError) else "operational"
+        )
         try:
             base_sha256_after = sha256_file(disk)
         except P9QemuError:
@@ -244,6 +249,7 @@ def _run_validation(
     except KeyboardInterrupt:
         interrupted = True
         error_text = "validation was interrupted"
+        failure_category = "operational"
         try:
             base_sha256_after = sha256_file(disk)
         except P9QemuError:
@@ -282,6 +288,7 @@ def _run_validation(
         network_mode=network_mode,
         artifacts=artifacts,
         error=error_text,
+        failure_category=failure_category,
     )
     write_json_new(paths.manifest, manifest)
     if interrupted:

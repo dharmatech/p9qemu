@@ -99,12 +99,14 @@ def test_validation_manifest_records_immutability_and_check_categories() -> None
         validation=validation,
         network_mode="optional",
         artifacts={"console": {"path": "boot.raw.log", "sha256": "c" * 64}},
+        failure_category=None,
     )
     assert manifest["status"] == "passed-with-environmental-failures"
     assert manifest["image"]["unchanged"] is True
     assert manifest["overlay"]["removed"] is True
     assert manifest["overlay"]["retained_on_failure"] is False
     assert manifest["validation"]["checks"][1]["category"] == "environmental"
+    assert manifest["validation"]["failure_category"] is None
 
 
 def test_text_writer_requires_existing_parent(tmp_path: Path) -> None:

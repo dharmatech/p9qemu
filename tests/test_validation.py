@@ -9,6 +9,7 @@ from p9qemu.answers import load_answers
 from p9qemu.errors import P9QemuError
 from p9qemu.pexpect_validation import PexpectGuestValidationTransport
 from p9qemu.validation import (
+    GuestValidationError,
     GuestValidationProfile,
     build_guest_validation_profile,
     drive_guest_validation,
@@ -103,13 +104,16 @@ def test_optional_environmental_failure_does_not_invalidate_image() -> None:
 
 def test_required_network_failure_stops_before_shutdown_claim() -> None:
     transport = FakeTransport(ping_output="can't translate address")
-    with pytest.raises(P9QemuError, match="guest.network-ping.*'rtt'"):
+    with pytest.raises(
+        GuestValidationError, match="guest.network-ping.*'rtt'"
+    ) as captured:
         drive_guest_validation(
             transport,
             profile(),
             network_mode="required",
             progress=lambda _message: None,
         )
+    assert captured.value.category == "environmental"
     assert "fshalt" not in transport.lines
 
 
@@ -152,3 +156,13 @@ def test_pexpect_validation_eof_names_state() -> None:
         P9QemuError, match="QEMU exited before guest validation state 'guest.state'"
     ):
         transport.wait("guest.state", "prompt", 9)
+
+
+def test_pexpect_network_timeout_is_categorized_as_environmental() -> None:
+    transport = PexpectGuestValidationTransport(
+        FailingChild(pexpect.TIMEOUT("timeout"))
+    )
+    with pytest.raises(GuestValidationError) as captured:
+        transport.wait("guest.network-ping", "prompt", 9)
+    assert captured.value.category == "environmental"
+    assert captured.value.state == "guest.network-ping"

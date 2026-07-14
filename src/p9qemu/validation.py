@@ -19,6 +19,15 @@ Progress = Callable[[str], None]
 SHELL_PROMPT = r"term%[ \t]*"
 
 
+class GuestValidationError(P9QemuError):
+    """A state-specific guest validation failure with a stable category."""
+
+    def __init__(self, message: str, *, category: CheckCategory, state: str) -> None:
+        super().__init__(message)
+        self.category = category
+        self.state = state
+
+
 @dataclass(frozen=True)
 class ValidationCheck:
     """One guest validation observation."""
@@ -106,9 +115,14 @@ def _require_output(state: str, output: str, expected: tuple[str, ...]) -> None:
     if missing:
         names = ", ".join(repr(value) for value in missing)
         recent = output[-500:].replace("\r", "\\r").replace("\n", "\\n")
-        raise P9QemuError(
+        category: CheckCategory = (
+            "environmental" if state == "guest.network-ping" else "deterministic"
+        )
+        raise GuestValidationError(
             f"guest validation state {state!r} did not contain {names}; "
-            f"recent output: {recent!r}"
+            f"recent output: {recent!r}",
+            category=category,
+            state=state,
         )
 
 

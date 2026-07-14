@@ -9,6 +9,7 @@ import pexpect
 
 from p9qemu.errors import P9QemuError
 from p9qemu.validation import (
+    GuestValidationError,
     GuestValidationProfile,
     GuestValidationResult,
     NetworkMode,
@@ -32,17 +33,22 @@ class PexpectGuestValidationTransport:
         return value[-500:].replace("\r", "\\r").replace("\n", "\\n")
 
     def wait(self, state: str, pattern: str, timeout_seconds: int) -> None:
+        category = "environmental" if state == "guest.network-ping" else "deterministic"
         try:
             self.child.expect(pattern, timeout=timeout_seconds)
         except pexpect.TIMEOUT as error:
-            raise P9QemuError(
+            raise GuestValidationError(
                 f"timed out after {timeout_seconds}s waiting for guest validation "
-                f"state {state!r}; recent output: {self._recent_output()!r}"
+                f"state {state!r}; recent output: {self._recent_output()!r}",
+                category=category,
+                state=state,
             ) from error
         except pexpect.EOF as error:
-            raise P9QemuError(
+            raise GuestValidationError(
                 f"QEMU exited before guest validation state {state!r}; "
-                f"recent output: {self._recent_output()!r}"
+                f"recent output: {self._recent_output()!r}",
+                category=category,
+                state=state,
             ) from error
 
     def send_line(self, value: str) -> None:

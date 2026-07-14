@@ -205,6 +205,7 @@ def build_validation_manifest(
     network_mode: str,
     artifacts: Mapping[str, Mapping[str, object]],
     error: str | None = None,
+    failure_category: str | None = None,
 ) -> dict[str, object]:
     """Build the version 1 disposable-overlay validation manifest."""
 
@@ -256,6 +257,7 @@ def build_validation_manifest(
             "network_mode": network_mode,
             "checks": checks,
             "error": error,
+            "failure_category": failure_category,
         },
         "artifacts": {name: dict(record) for name, record in artifacts.items()},
     }
