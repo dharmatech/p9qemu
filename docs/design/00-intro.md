@@ -335,6 +335,11 @@ Answer-driven automated installation and the provenance records for producing
 those base images are described in
 [`04-automated-installation-answer-files.md`](04-automated-installation-answer-files.md).
 
+Concurrent Plan 9 networking without a host bridge is evaluated in
+[`07-multiple-plan9-vms.md`](07-multiple-plan9-vms.md). A later product layer
+that distributes and orchestrates complete versioned labs is described in
+[`08-downloadable-multi-vm-labs.md`](08-downloadable-multi-vm-labs.md).
+
 ## Resolved version 1 decisions
 
 1. The compressed archive's SHA-256 digest is

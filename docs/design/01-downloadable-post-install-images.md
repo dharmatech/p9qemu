@@ -164,9 +164,11 @@ should not require a particular accelerator unless that requirement is explicit
 in its metadata.
 
 Port forwards and fixed host ports also require attention. Multiple instances
-cannot bind the same host ports concurrently. Version 2 should support either
-configurable forwards, a deterministic per-instance offset, or clear conflict
-detection before launch.
+cannot bind the same host address and ports concurrently. The alternatives and
+recommended per-VM loopback-address plus shared-Ethernet topology are described
+in [`07-multiple-plan9-vms.md`](07-multiple-plan9-vms.md). Packaging several
+such instances as a reproducible environment is described separately in
+[`08-downloadable-multi-vm-labs.md`](08-downloadable-multi-vm-labs.md).
 
 ## Version selection and updates
 
