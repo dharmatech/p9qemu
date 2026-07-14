@@ -133,6 +133,7 @@ def build_start_command(
 
 
 _POWERSHELL_SAFE = re.compile(r"^[A-Za-z0-9_@%+=:,./\\-]+$")
+_COMPACT_LEADING_OPTIONS = frozenset({"-m", "-cpu", "-smp", "-accel", "-display"})
 
 
 def _quote_powershell(argument: str) -> str:
@@ -141,7 +142,41 @@ def _quote_powershell(argument: str) -> str:
     return "'" + argument.replace("'", "''") + "'"
 
 
+def _join_powershell(arguments: list[str]) -> str:
+    return " ".join(_quote_powershell(argument) for argument in arguments)
+
+
+def _group_options(arguments: list[str]) -> list[list[str]]:
+    groups: list[list[str]] = []
+    for argument in arguments:
+        if argument.startswith("-") and argument != "-":
+            groups.append([argument])
+        elif groups:
+            groups[-1].append(argument)
+        else:
+            groups.append([argument])
+    return groups
+
+
 def render_command(command: list[str], *, system: str) -> str:
+    if not command:
+        return ""
+
+    groups = _group_options(command[1:])
+    compact: list[str] = []
+    while groups and groups[0][0] in _COMPACT_LEADING_OPTIONS:
+        compact.extend(groups.pop(0))
+
     if system == "Windows":
-        return " ".join(_quote_powershell(argument) for argument in command)
-    return shlex.join(command)
+        lines = [f"& {_quote_powershell(command[0])}"]
+        quote_group = _join_powershell
+        continuation = "`"
+    else:
+        lines = [shlex.quote(command[0])]
+        quote_group = shlex.join
+        continuation = "\\"
+
+    if compact:
+        lines.append(quote_group(compact))
+    lines.extend(quote_group(group) for group in groups)
+    return f" {continuation}\n    ".join(lines)

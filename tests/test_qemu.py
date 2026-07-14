@@ -72,19 +72,48 @@ def test_start_command_includes_kvm_and_all_known_forwards() -> None:
 
 def test_posix_rendering_is_copyable() -> None:
     rendered = render_command(
-        ["qemu-system-x86_64", "-drive", "file=/tmp/a disk.qcow2"],
+        [
+            "qemu-system-x86_64",
+            "-m",
+            "1024",
+            "-cpu",
+            "host",
+            "-accel",
+            "kvm",
+            "-net",
+            "user",
+            "-drive",
+            "file=/tmp/a disk.qcow2",
+        ],
         system="Linux",
     )
-    assert rendered == "qemu-system-x86_64 -drive 'file=/tmp/a disk.qcow2'"
+    assert rendered == (
+        "qemu-system-x86_64 \\\n"
+        "    -m 1024 -cpu host -accel kvm \\\n"
+        "    -net user \\\n"
+        "    -drive 'file=/tmp/a disk.qcow2'"
+    )
 
 
 def test_powershell_rendering_is_copyable() -> None:
     rendered = render_command(
-        [r"C:\Program Files\qemu\qemu-system-x86_64.exe", "", "it's fine"],
+        [
+            r"C:\Program Files\qemu\qemu-system-x86_64.exe",
+            "-m",
+            "1024",
+            "-accel",
+            "whpx,kernel-irqchip=off",
+            "-display",
+            "sdl",
+            "-drive",
+            r"file=C:\VMs\it's fine.qcow2",
+        ],
         system="Windows",
     )
     assert rendered == (
-        "'C:\\Program Files\\qemu\\qemu-system-x86_64.exe' '' 'it''s fine'"
+        "& 'C:\\Program Files\\qemu\\qemu-system-x86_64.exe' `\n"
+        "    -m 1024 -accel whpx,kernel-irqchip=off -display sdl `\n"
+        "    -drive 'file=C:\\VMs\\it''s fine.qcow2'"
     )
 
 
