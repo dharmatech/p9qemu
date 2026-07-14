@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 from typing import Any
 from uuid import uuid4
@@ -22,6 +23,7 @@ from p9qemu.validation import GuestValidationResult
 
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
+_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 
 
 def utc_timestamp() -> str:
@@ -33,6 +35,14 @@ def utc_timestamp() -> str:
         .isoformat()
         .replace("+00:00", "Z")
     )
+
+
+def validate_source_commit(value: str) -> str:
+    """Require an exact lowercase Git commit rather than a moving ref."""
+
+    if not _COMMIT.fullmatch(value):
+        raise P9QemuError("source commit must be a complete 40-character Git SHA")
+    return value
 
 
 def write_text_new(path: Path, text: str) -> None:
@@ -58,7 +68,9 @@ def write_text_new(path: Path, text: str) -> None:
                 f"could not publish provenance artifact {path}: {error}"
             ) from error
     except OSError as error:
-        raise P9QemuError(f"could not write provenance artifact {path}: {error}") from error
+        raise P9QemuError(
+            f"could not write provenance artifact {path}: {error}"
+        ) from error
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -159,9 +171,7 @@ def qemu_img_info(
     except OSError as error:
         raise P9QemuError(f"could not run qemu-img info: {error}") from error
     if result.returncode != 0:
-        raise P9QemuError(
-            f"qemu-img info exited with status {result.returncode}"
-        )
+        raise P9QemuError(f"qemu-img info exited with status {result.returncode}")
     try:
         document = json.loads(result.stdout)
     except json.JSONDecodeError as error:
@@ -178,6 +188,76 @@ def require_unchanged_image(before: str, after: str) -> None:
         raise P9QemuError(
             "base image digest changed during disposable-overlay validation"
         )
+
+
+def build_install_manifest(
+    *,
+    started_at: str,
+    completed_at: str,
+    source_commit: str,
+    answers: InstallAnswers,
+    answers_path: Path,
+    answers_sha256: str,
+    iso_path: Path,
+    iso_sha256: str,
+    image_path: Path,
+    image_sha256: str,
+    console_log: Path,
+    console_log_sha256: str,
+    host: HostInfo,
+    acceleration: Acceleration,
+    memory_mib: int,
+    qemu_system_version: str,
+    qemu_img_version: str,
+    qemu_command: list[str],
+    rendered_qemu_command: str,
+    image_info: Mapping[str, object],
+    image_check: str,
+) -> dict[str, object]:
+    """Build the private, path-bearing manifest for a completed install."""
+
+    return {
+        "schema": 1,
+        "kind": "p9qemu-image-installation",
+        "status": "passed",
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "p9qemu": {"version": __version__, "commit": source_commit},
+        "answers": {
+            "path": str(answers_path),
+            "sha256": answers_sha256,
+            "resolved": asdict(answers),
+        },
+        "media": {"path": str(iso_path), "sha256": iso_sha256},
+        "image": {
+            "path": str(image_path),
+            "sha256": image_sha256,
+            "qemu_img_info": dict(image_info),
+            "qemu_img_check": image_check,
+        },
+        "console_log": {
+            "path": str(console_log),
+            "sha256": console_log_sha256,
+        },
+        "host": {
+            "system": host.system,
+            "distribution_id": host.distribution_id,
+            "distribution_name": host.distribution_name,
+            "version_id": host.version_id,
+            "architecture": platform.machine(),
+            "kernel": platform.release(),
+        },
+        "qemu": {
+            "system_version": qemu_system_version,
+            "img_version": qemu_img_version,
+            "acceleration": acceleration.name,
+            "memory_mib": memory_mib,
+            "command": {
+                "argv": qemu_command,
+                "rendered": rendered_qemu_command,
+            },
+        },
+    }
 
 
 def build_validation_manifest(
@@ -210,7 +290,9 @@ def build_validation_manifest(
     """Build the version 1 disposable-overlay validation manifest."""
 
     unchanged = base_sha256_before == base_sha256_after
-    checks = [] if validation is None else [asdict(check) for check in validation.checks]
+    checks = (
+        [] if validation is None else [asdict(check) for check in validation.checks]
+    )
     return {
         "schema": 1,
         "kind": "p9qemu-image-validation",

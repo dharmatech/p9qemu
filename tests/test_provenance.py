@@ -10,6 +10,7 @@ from p9qemu.errors import P9QemuError
 from p9qemu.host import Acceleration, HostInfo
 from p9qemu.provenance import (
     artifact_record,
+    build_install_manifest,
     build_validation_manifest,
     qemu_img_check,
     qemu_img_info,
@@ -71,9 +72,7 @@ def test_validation_manifest_records_immutability_and_check_categories() -> None
     validation = GuestValidationResult(
         (
             ValidationCheck("serial-boot", "deterministic", "passed", "booted"),
-            ValidationCheck(
-                "network-ping", "environmental", "failed", "offline"
-            ),
+            ValidationCheck("network-ping", "environmental", "failed", "offline"),
         )
     )
     manifest = build_validation_manifest(
@@ -107,6 +106,39 @@ def test_validation_manifest_records_immutability_and_check_categories() -> None
     assert manifest["overlay"]["retained_on_failure"] is False
     assert manifest["validation"]["checks"][1]["category"] == "environmental"
     assert manifest["validation"]["failure_category"] is None
+
+
+def test_install_manifest_binds_source_media_answers_image_and_log() -> None:
+    answers = load_answers(REFERENCE_ANSWERS)
+    manifest = build_install_manifest(
+        started_at="2026-07-14T00:00:00Z",
+        completed_at="2026-07-14T00:01:00Z",
+        source_commit="a" * 40,
+        answers=answers,
+        answers_path=Path("answers.toml"),
+        answers_sha256="b" * 64,
+        iso_path=Path("install.iso"),
+        iso_sha256=answers.iso_sha256,
+        image_path=Path("target.qcow2"),
+        image_sha256="c" * 64,
+        console_log=Path("install.raw.log"),
+        console_log_sha256="d" * 64,
+        host=HostInfo(system="Linux", distribution_id="ubuntu"),
+        acceleration=Acceleration("KVM", ("-accel", "kvm")),
+        memory_mib=1024,
+        qemu_system_version="QEMU 9",
+        qemu_img_version="qemu-img 9",
+        qemu_command=["qemu-system-x86_64", "-accel", "kvm"],
+        rendered_qemu_command="qemu-system-x86_64 -accel kvm",
+        image_info={"format": "qcow2", "dirty-flag": False},
+        image_check="No errors found\n",
+    )
+    assert manifest["kind"] == "p9qemu-image-installation"
+    assert manifest["p9qemu"]["commit"] == "a" * 40
+    assert manifest["answers"]["sha256"] == "b" * 64
+    assert manifest["media"]["sha256"] == answers.iso_sha256
+    assert manifest["image"]["sha256"] == "c" * 64
+    assert manifest["console_log"]["sha256"] == "d" * 64
 
 
 def test_text_writer_requires_existing_parent(tmp_path: Path) -> None:

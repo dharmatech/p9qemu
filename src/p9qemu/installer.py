@@ -9,6 +9,7 @@ from typing import Literal
 from p9qemu.answers import (
     ISO_SHA256_11554,
     PROFILE_ID_11554_HJFS,
+    PROFILE_ID_11554_HJFS_GMT_V1,
     InstallAnswers,
 )
 from p9qemu.errors import P9QemuError
@@ -99,10 +100,13 @@ def _literal_step(
 def build_11554_hjfs_profile(answers: InstallAnswers) -> InstallerProfile:
     """Build the first intentionally narrow 9front 11554 HJFS profile."""
 
-    if answers.installer_profile != PROFILE_ID_11554_HJFS:
+    supported_profiles = {
+        PROFILE_ID_11554_HJFS,
+        PROFILE_ID_11554_HJFS_GMT_V1,
+    }
+    if answers.installer_profile not in supported_profiles:
         raise P9QemuError(
-            f"unsupported installer profile {answers.installer_profile!r}; "
-            f"expected {PROFILE_ID_11554_HJFS!r}"
+            f"unsupported installer profile {answers.installer_profile!r}"
         )
     if answers.iso_sha256 != ISO_SHA256_11554:
         raise P9QemuError(

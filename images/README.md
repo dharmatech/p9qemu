@@ -20,3 +20,4 @@ for an individual build.
 ## Reference builds
 
 - [`9front-11554-amd64-hjfs-manual-001`](9front-11554-amd64-hjfs-manual-001/README.md) — experimental manual serial-console installation used to derive the first answer-file profile.
+- [`9front-11554-amd64-hjfs-gmt-reference-001`](9front-11554-amd64-hjfs-gmt-reference-001/README.md) — canonical GMT answer profile for the first fresh reference-image build.

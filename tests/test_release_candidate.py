@@ -36,7 +36,7 @@ def _artifact(path: Path, *, root: Path) -> dict[str, object]:
     }
 
 
-def _validation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+def _validation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path]:
     disk = tmp_path / "target.qcow2"
     disk.write_bytes(b"synthetic qcow2 fixture\0" * 64)
     answers = tmp_path / "answers.toml"
@@ -59,6 +59,60 @@ def _validation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
 
     image_digest = sha256_file(disk)
     answers_digest = sha256_file(answers)
+    installation = {
+        "schema": 1,
+        "kind": "p9qemu-image-installation",
+        "status": "passed",
+        "started_at": "2026-07-14T00:58:00Z",
+        "completed_at": "2026-07-14T00:59:00Z",
+        "p9qemu": {"version": "0.1.0", "commit": "a" * 40},
+        "answers": {
+            "path": "/home/developer/private/answers.toml",
+            "sha256": answers_digest,
+            "resolved": asdict(load_answers(answers)),
+        },
+        "media": {
+            "path": "/home/developer/private/install.iso",
+            "sha256": load_answers(answers).iso_sha256,
+        },
+        "image": {
+            "path": "/home/developer/private/target.qcow2",
+            "sha256": image_digest,
+            "qemu_img_info": {
+                "filename": "/home/developer/private/target.qcow2",
+                "format": "qcow2",
+                "virtual-size": 1024,
+                "actual-size": disk.stat().st_size,
+                "cluster-size": 65536,
+                "dirty-flag": False,
+            },
+            "qemu_img_check": "No errors found\n",
+        },
+        "console_log": {
+            "path": "/home/developer/private/console.raw.log",
+            "sha256": sha256_file(install_log),
+        },
+        "host": {
+            "system": "Linux",
+            "distribution_id": "ubuntu",
+            "distribution_name": "Ubuntu",
+            "version_id": "22.04",
+            "architecture": "x86_64",
+            "kernel": "private-kernel-detail",
+        },
+        "qemu": {
+            "system_version": "QEMU 9",
+            "img_version": "qemu-img 9",
+            "acceleration": "KVM",
+            "memory_mib": 1024,
+            "command": {
+                "argv": ["/usr/bin/qemu", "/home/developer/private/target.qcow2"],
+                "rendered": "/usr/bin/qemu /home/developer/private/target.qcow2",
+            },
+        },
+    }
+    install_manifest = tmp_path / "install-manifest.json"
+    install_manifest.write_text(json.dumps(installation), encoding="utf-8")
     manifest = {
         "schema": 1,
         "kind": "p9qemu-image-validation",
@@ -129,6 +183,8 @@ def _validation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
                     "guest.user",
                     "guest.home",
                     "guest.sysname",
+                    "guest.timezone",
+                    "guest.home-clean",
                     "guest.plan9-ini",
                     "network-ping",
                     "orderly-shutdown",
@@ -143,17 +199,18 @@ def _validation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     }
     manifest_path = evidence / "manifest.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    return disk, answers, install_log, manifest_path
+    return disk, answers, install_log, install_manifest, manifest_path
 
 
 def _inputs(tmp_path: Path) -> CandidateInputs:
-    disk, answers, install_log, validation = _validation_fixture(tmp_path)
+    disk, answers, install_log, installation, validation = _validation_fixture(tmp_path)
     return CandidateInputs(
         identity=validate_identity("9front-11554-amd64-hjfs", "001"),
         source_commit="a" * 40,
         disk=disk,
         answers_path=answers,
         install_log=install_log,
+        install_manifest=installation,
         validation_manifest=validation,
         output_dir=tmp_path / "candidate",
         image_hygiene_reviewed=True,
@@ -222,6 +279,19 @@ def test_release_candidate_is_sanitized_and_round_trip_verified(
     assert release["hygiene"]["public_text_scan"] == "passed"
     assert release["source"]["p9qemu_commit"] == "a" * 40
 
+    public_installation_path = result.bundle_dir / "installation" / "manifest.json"
+    public_installation = json.loads(
+        public_installation_path.read_text(encoding="utf-8")
+    )
+    serialized_installation = json.dumps(public_installation)
+    assert public_installation["status"] == "passed"
+    assert "/home/developer" not in serialized_installation
+    assert "private-kernel-detail" not in serialized_installation
+    assert "command" not in public_installation["qemu"]
+    assert public_installation["source_manifest_sha256"] == sha256_file(
+        inputs.install_manifest
+    )
+
     public_validation_path = result.bundle_dir / "validation" / "manifest.json"
     public_validation = json.loads(public_validation_path.read_text(encoding="utf-8"))
     serialized = json.dumps(public_validation)
@@ -285,6 +355,17 @@ def test_release_candidate_rejects_unpromotable_validation(
         value[last] = "failed"
     inputs.validation_manifest.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(P9QemuError, match=message):
+        build_release_candidate(inputs)
+
+
+def test_release_candidate_rejects_unbound_installation_manifest(
+    tmp_path: Path,
+) -> None:
+    inputs = _inputs(tmp_path)
+    document = json.loads(inputs.install_manifest.read_text(encoding="utf-8"))
+    document["p9qemu"]["commit"] = "b" * 40
+    inputs.install_manifest.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(P9QemuError, match="source commit does not match"):
         build_release_candidate(inputs)
 
 

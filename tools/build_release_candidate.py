@@ -33,6 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--disk", type=Path, required=True)
     parser.add_argument("--answers", type=Path, required=True)
     parser.add_argument("--install-log", type=Path, required=True)
+    parser.add_argument("--install-manifest", type=Path, required=True)
     parser.add_argument("--validation-manifest", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
@@ -66,6 +67,7 @@ def run(argv: list[str] | None = None) -> int:
             disk=_absolute(args.disk),
             answers_path=_absolute(args.answers),
             install_log=_absolute(args.install_log),
+            install_manifest=_absolute(args.install_manifest),
             validation_manifest=_absolute(args.validation_manifest),
             output_dir=_absolute(args.output_dir),
             image_hygiene_reviewed=args.confirm_image_hygiene_reviewed,
@@ -76,12 +78,13 @@ def run(argv: list[str] | None = None) -> int:
         print(f"Immutable image: {inputs.disk}")
         print(f"Answer file: {inputs.answers_path}")
         print(f"Install log: {inputs.install_log}")
+        print(f"Installation manifest: {inputs.install_manifest}")
         print(f"Validation manifest: {inputs.validation_manifest}")
         print(f"New output directory: {inputs.output_dir}")
         print("Publishing: disabled")
 
         if args.dry_run:
-            _, _, image_sha256, answers_sha256, public_artifacts = (
+            _, _, _, image_sha256, answers_sha256, public_artifacts = (
                 inspect_candidate_inputs(inputs)
             )
             print("\nDry run passed; no output was created.")

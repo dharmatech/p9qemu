@@ -22,6 +22,9 @@ ROOT = Path(__file__).parents[1]
 REFERENCE = ROOT / "images" / "9front-11554-amd64-hjfs-manual-001"
 REFERENCE_ANSWERS = REFERENCE / "answers.toml"
 REFERENCE_TRANSCRIPT = REFERENCE / "transcripts" / "install.raw.log"
+GMT_REFERENCE_ANSWERS = (
+    ROOT / "images" / "9front-11554-amd64-hjfs-gmt-reference-001" / "answers.toml"
+)
 
 
 def profile():
@@ -53,6 +56,13 @@ def test_profile_records_its_revision_and_inspected_installer_source() -> None:
     installer_profile = profile()
     assert installer_profile.revision == INSTALLER_PROFILE_REVISION_11554 == 1
     assert installer_profile.source_revision == INSTALLER_SOURCE_REVISION_11554
+
+
+def test_gmt_profile_reuses_the_certified_11554_state_machine() -> None:
+    installer_profile = build_11554_hjfs_profile(load_answers(GMT_REFERENCE_ANSWERS))
+    steps = {step.state: step for step in installer_profile.steps}
+    assert installer_profile.profile_id == "9front-11554-amd64-hjfs-gmt-v1"
+    assert steps["tzsetup.timezone"].response == "GMT"
 
 
 def test_golden_transcript_has_the_recorded_digest() -> None:

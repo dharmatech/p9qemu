@@ -23,6 +23,7 @@ from p9qemu.media import sha256_file
 from p9qemu.provenance import (
     artifact_record,
     utc_timestamp,
+    validate_source_commit,
     write_json_new,
     write_text_new,
 )
@@ -30,7 +31,6 @@ from p9qemu.qemu import DEFAULT_PORT_FORWARDS, build_start_command, render_comma
 
 
 _IDENTIFIER = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _HOST_PATH_PATTERNS = (
     re.compile(r"(?i)\b[a-z]:(?:\\{1,2}|/)(?:users|home)(?:\\{1,2}|/)[^\\/\s]+"),
     re.compile(r"/(?:home|users)/[^/\s]+"),
@@ -57,6 +57,8 @@ _REQUIRED_VALIDATION_CHECKS = {
     "guest.user",
     "guest.home",
     "guest.sysname",
+    "guest.timezone",
+    "guest.home-clean",
     "guest.plan9-ini",
     "network-ping",
     "orderly-shutdown",
@@ -80,6 +82,7 @@ class CandidateInputs:
     disk: Path
     answers_path: Path
     install_log: Path
+    install_manifest: Path
     validation_manifest: Path
     output_dir: Path
     image_hygiene_reviewed: bool
@@ -111,14 +114,6 @@ def validate_identity(image_id: str, build_id: str) -> CandidateIdentity:
     if len(identity.bundle_name) > 90:
         raise P9QemuError("release-candidate bundle name is too long")
     return identity
-
-
-def validate_source_commit(value: str) -> str:
-    """Require an exact lowercase Git commit rather than a moving ref."""
-
-    if not _COMMIT.fullmatch(value):
-        raise P9QemuError("source commit must be a complete 40-character Git SHA")
-    return value
 
 
 def load_json_object(path: Path, label: str) -> dict[str, Any]:
@@ -203,6 +198,49 @@ def _require_validation_checkpoints(
         raise P9QemuError("validation manifest requires a positive image virtual size")
     if image_info.get("dirty-flag") is not False:
         raise P9QemuError("release candidate QCOW2 image has a dirty flag")
+
+
+def _require_installation_checkpoints(
+    document: Mapping[str, Any],
+    *,
+    source_commit: str,
+    answers: InstallAnswers,
+    image_sha256: str,
+    answers_sha256: str,
+    install_log_sha256: str,
+) -> None:
+    if document.get("schema") != 1 or document.get("kind") != (
+        "p9qemu-image-installation"
+    ):
+        raise P9QemuError("unsupported installation manifest schema or kind")
+    if document.get("status") != "passed":
+        raise P9QemuError("release candidates require installation status 'passed'")
+    p9qemu = _mapping(document.get("p9qemu"), "installation.p9qemu")
+    if p9qemu.get("commit") != source_commit:
+        raise P9QemuError("installation source commit does not match the candidate")
+    manifest_answers = _mapping(document.get("answers"), "installation.answers")
+    if manifest_answers.get("sha256") != answers_sha256:
+        raise P9QemuError("installation answer digest does not match the supplied file")
+    if manifest_answers.get("resolved") != asdict(answers):
+        raise P9QemuError(
+            "installation resolved answers do not match the supplied file"
+        )
+    media = _mapping(document.get("media"), "installation.media")
+    if media.get("sha256") != answers.iso_sha256:
+        raise P9QemuError("installation media digest does not match the answer profile")
+    image = _mapping(document.get("image"), "installation.image")
+    if image.get("sha256") != image_sha256:
+        raise P9QemuError("installation image digest does not match the supplied disk")
+    if not _string(image.get("qemu_img_check"), "image.qemu_img_check").strip():
+        raise P9QemuError("installation manifest contains no qemu-img check evidence")
+    info = _mapping(image.get("qemu_img_info"), "installation.image.qemu_img_info")
+    if info.get("format") != "qcow2" or info.get("dirty-flag") is not False:
+        raise P9QemuError("installation manifest does not describe a clean QCOW2 image")
+    console = _mapping(document.get("console_log"), "installation.console_log")
+    if console.get("sha256") != install_log_sha256:
+        raise P9QemuError(
+            "installation transcript digest does not match the supplied log"
+        )
 
 
 def _sanitized_image_info(value: object) -> dict[str, object]:
@@ -295,6 +333,58 @@ def sanitize_validation_manifest(
             "checks": validation.get("checks"),
             "error": validation.get("error"),
             "failure_category": validation.get("failure_category"),
+        },
+    }
+
+
+def sanitize_install_manifest(
+    document: Mapping[str, Any],
+    *,
+    source_sha256: str,
+) -> dict[str, object]:
+    """Create the allow-listed, path-free public installation record."""
+
+    p9qemu = _mapping(document.get("p9qemu"), "installation.p9qemu")
+    answers = _mapping(document.get("answers"), "installation.answers")
+    media = _mapping(document.get("media"), "installation.media")
+    image = _mapping(document.get("image"), "installation.image")
+    console = _mapping(document.get("console_log"), "installation.console_log")
+    host = _mapping(document.get("host"), "installation.host")
+    qemu = _mapping(document.get("qemu"), "installation.qemu")
+    return {
+        "schema": 1,
+        "kind": "p9qemu-public-image-installation",
+        "source_manifest_sha256": source_sha256,
+        "status": document.get("status"),
+        "started_at": document.get("started_at"),
+        "completed_at": document.get("completed_at"),
+        "p9qemu": {
+            "version": p9qemu.get("version"),
+            "commit": p9qemu.get("commit"),
+        },
+        "answers": {
+            "sha256": answers.get("sha256"),
+            "resolved": answers.get("resolved"),
+        },
+        "media": {"sha256": media.get("sha256")},
+        "image": {
+            "sha256": image.get("sha256"),
+            "qemu_img_info": _sanitized_image_info(image.get("qemu_img_info")),
+            "qemu_img_check": "passed",
+        },
+        "console_log": {"sha256": console.get("sha256")},
+        "host": {
+            name: host.get(name)
+            for name in ("system", "distribution_id", "version_id", "architecture")
+        },
+        "qemu": {
+            name: qemu.get(name)
+            for name in (
+                "system_version",
+                "img_version",
+                "acceleration",
+                "memory_mib",
+            )
         },
     }
 
@@ -473,6 +563,9 @@ def _release_manifest(
     answers: InstallAnswers,
     image_path: Path,
     image_sha256: str,
+    public_installation_path: Path,
+    public_installation: Mapping[str, Any],
+    private_installation_sha256: str,
     public_validation_path: Path,
     public_validation: Mapping[str, Any],
     private_validation_sha256: str,
@@ -508,6 +601,11 @@ def _release_manifest(
             "virtual_size": info.get("virtual-size"),
             "stored_size": image_path.stat().st_size,
             "sha256": image_sha256,
+        },
+        "installation": {
+            "path": public_installation_path.relative_to(image_path.parent).as_posix(),
+            "status": public_installation.get("status"),
+            "private_source_manifest_sha256": private_installation_sha256,
         },
         "validation": {
             "path": public_validation_path.relative_to(image_path.parent).as_posix(),
@@ -696,7 +794,14 @@ def _require_new_output(path: Path) -> None:
 
 def inspect_candidate_inputs(
     inputs: CandidateInputs,
-) -> tuple[InstallAnswers, dict[str, Any], str, str, dict[str, Path]]:
+) -> tuple[
+    InstallAnswers,
+    dict[str, Any],
+    dict[str, Any],
+    str,
+    str,
+    dict[str, Path],
+]:
     """Validate all candidate inputs without creating any output."""
 
     validate_identity(inputs.identity.image_id, inputs.identity.build_id)
@@ -707,6 +812,7 @@ def inspect_candidate_inputs(
         (inputs.disk, "disk image"),
         (inputs.answers_path, "answer file"),
         (inputs.install_log, "install log"),
+        (inputs.install_manifest, "installation manifest"),
         (inputs.validation_manifest, "validation manifest"),
     ):
         _require_input_file(path, label)
@@ -717,6 +823,16 @@ def inspect_candidate_inputs(
     answers = load_answers(inputs.answers_path)
     image_sha256 = sha256_file(inputs.disk)
     answers_sha256 = sha256_file(inputs.answers_path)
+    install_log_sha256 = sha256_file(inputs.install_log)
+    installation = load_json_object(inputs.install_manifest, "installation manifest")
+    _require_installation_checkpoints(
+        installation,
+        source_commit=inputs.source_commit,
+        answers=answers,
+        image_sha256=image_sha256,
+        answers_sha256=answers_sha256,
+        install_log_sha256=install_log_sha256,
+    )
     validation = load_json_object(inputs.validation_manifest, "validation manifest")
     _require_validation_checkpoints(
         validation,
@@ -733,13 +849,20 @@ def inspect_candidate_inputs(
     )
     for path in (inputs.answers_path, inputs.install_log, *public_artifacts.values()):
         scan_public_text([path], root=path.parent)
-    return answers, validation, image_sha256, answers_sha256, public_artifacts
+    return (
+        answers,
+        installation,
+        validation,
+        image_sha256,
+        answers_sha256,
+        public_artifacts,
+    )
 
 
 def build_release_candidate(inputs: CandidateInputs) -> CandidateResult:
     """Build and round-trip verify one local release candidate atomically."""
 
-    answers, validation, image_sha256, _, validation_artifacts = (
+    answers, installation, validation, image_sha256, _, validation_artifacts = (
         inspect_candidate_inputs(inputs)
     )
     temporary = inputs.output_dir.with_name(
@@ -751,11 +874,13 @@ def build_release_candidate(inputs: CandidateInputs) -> CandidateResult:
         temporary.mkdir()
         bundle = temporary / inputs.identity.bundle_name
         bundle.mkdir()
+        (bundle / "installation").mkdir()
         (bundle / "validation").mkdir()
         image_path = bundle / f"{inputs.identity.bundle_name}.qcow2"
         answers_path = bundle / "answers.toml"
         install_log = bundle / "install.raw.log"
         running_path = bundle / "RUNNING.md"
+        public_installation_path = bundle / "installation" / "manifest.json"
         public_validation_path = bundle / "validation" / "manifest.json"
 
         copy_file_new(inputs.disk, image_path)
@@ -766,6 +891,12 @@ def build_release_candidate(inputs: CandidateInputs) -> CandidateResult:
         for destination, source in validation_artifacts.items():
             copy_file_new(source, bundle / destination)
 
+        private_installation_sha256 = sha256_file(inputs.install_manifest)
+        public_installation = sanitize_install_manifest(
+            installation,
+            source_sha256=private_installation_sha256,
+        )
+        write_json_new(public_installation_path, public_installation)
         private_validation_sha256 = sha256_file(inputs.validation_manifest)
         public_validation = sanitize_validation_manifest(
             validation,
@@ -788,6 +919,9 @@ def build_release_candidate(inputs: CandidateInputs) -> CandidateResult:
             answers=answers,
             image_path=image_path,
             image_sha256=image_sha256,
+            public_installation_path=public_installation_path,
+            public_installation=public_installation,
+            private_installation_sha256=private_installation_sha256,
             public_validation_path=public_validation_path,
             public_validation=public_validation,
             private_validation_sha256=private_validation_sha256,
