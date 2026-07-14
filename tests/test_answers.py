@@ -8,6 +8,7 @@ import pytest
 from p9qemu.answers import (
     ISO_SHA256_11554,
     PROFILE_ID_11554_HJFS,
+    PROFILE_ID_11554_HJFS_GMT_V1,
     load_answers,
     parse_answers,
 )
@@ -17,6 +18,9 @@ from p9qemu.errors import P9QemuError
 ROOT = Path(__file__).parents[1]
 REFERENCE_ANSWERS = (
     ROOT / "images" / "9front-11554-amd64-hjfs-manual-001" / "answers.toml"
+)
+GMT_REFERENCE_ANSWERS = (
+    ROOT / "images" / "9front-11554-amd64-hjfs-gmt-reference-001" / "answers.toml"
 )
 
 
@@ -32,6 +36,15 @@ def test_reference_answer_file_is_the_supported_baseline() -> None:
     assert answers.filesystem == "hjfs"
     assert answers.hjfs_partition == "/dev/sd00/fs"
     assert answers.timezone == "US_Pacific"
+
+
+def test_gmt_reference_is_a_distinct_qualified_profile() -> None:
+    answers = load_answers(GMT_REFERENCE_ANSWERS)
+    assert answers.installer_profile == PROFILE_ID_11554_HJFS_GMT_V1
+    assert answers.iso_sha256 == ISO_SHA256_11554
+    assert answers.system_name == "cirno"
+    assert answers.user == "glenda"
+    assert answers.timezone == "GMT"
 
 
 def test_unknown_top_level_key_is_rejected() -> None:
@@ -80,6 +93,14 @@ def test_initial_profile_rejects_unqualified_variations(
     document = reference_document()
     document[table][key] = value
     with pytest.raises(P9QemuError, match=message):
+        parse_answers(document)
+
+
+def test_gmt_profile_rejects_a_different_timezone() -> None:
+    with GMT_REFERENCE_ANSWERS.open("rb") as stream:
+        document = tomllib.load(stream)
+    document["install"]["timezone"] = "US_Pacific"
+    with pytest.raises(P9QemuError, match="install.timezone"):
         parse_answers(document)
 
 

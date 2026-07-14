@@ -46,6 +46,7 @@ class GuestValidationProfile:
     user: str
     home: str
     system_name: str
+    timezone: str
     root_partition: str
     plan9_ini_values: tuple[str, ...]
 
@@ -97,6 +98,7 @@ def build_guest_validation_profile(
         user=answers.user,
         home=f"/usr/{answers.user}",
         system_name=answers.system_name,
+        timezone=answers.timezone,
         root_partition=answers.hjfs_partition,
         plan9_ini_values=(
             f"bootargs=local!{answers.hjfs_partition} -m {answers.hjfs_cache_mib}",
@@ -137,6 +139,26 @@ def _validated_command(
 ) -> None:
     output = transport.command(state, command, SHELL_PROMPT, 60)
     _require_output(state, output, expected)
+    checks.append(_passed(state, detail))
+
+
+def _validated_empty_command(
+    transport: GuestValidationTransport,
+    checks: list[ValidationCheck],
+    *,
+    state: str,
+    command: str,
+    detail: str,
+) -> None:
+    output = transport.command(state, command, SHELL_PROMPT, 60)
+    if output.strip():
+        recent = output[-500:].replace("\r", "\\r").replace("\n", "\\n")
+        raise GuestValidationError(
+            f"guest validation state {state!r} expected no output; "
+            f"recent output: {recent!r}",
+            category="deterministic",
+            state=state,
+        )
     checks.append(_passed(state, detail))
 
 
@@ -205,6 +227,20 @@ def drive_guest_validation(
         command="cat /dev/sysname",
         expected=(profile.system_name,),
         detail=f"system name is {profile.system_name}",
+    )
+    _validated_empty_command(
+        transport,
+        checks,
+        state="guest.timezone",
+        command=f"cmp /adm/timezone/{profile.timezone} /adm/timezone/local",
+        detail=f"persistent timezone is {profile.timezone}",
+    )
+    _validated_empty_command(
+        transport,
+        checks,
+        state="guest.home-clean",
+        command=f"walk -f {profile.home}",
+        detail=f"{profile.home} contains no personal files",
     )
     transport.command("guest.mount-9fat", "9fs 9fat", SHELL_PROMPT, 60)
     _validated_command(

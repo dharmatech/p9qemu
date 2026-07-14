@@ -23,7 +23,8 @@ hashes before any external state changes.
 The local tool accepts:
 
 - an immutable image and its complete build identity;
-- the exact answer file and raw installation transcript;
+- the exact answer file, raw installation transcript, and successful private
+  installation manifest;
 - a successful disposable-overlay validation manifest and its evidence; and
 - explicit confirmation that the guest image contents received a hygiene
   review.
@@ -33,6 +34,8 @@ Promotion fails unless:
 - the image ID and build ID are immutable, filename-safe values rather than a
   moving name such as `latest`;
 - the source revision is a complete 40-character Git commit;
+- the installation manifest binds that source revision to the supplied answer
+  file, verified media, transcript, clean QCOW2, and resulting image digest;
 - the supplied image and answer digests match the validation manifest;
 - validation status is `passed`, every required guest check passed, and no
   validation error was recorded;
@@ -42,16 +45,24 @@ Promotion fails unless:
 - copied public text passes the host-path and common-secret scan.
 
 The required guest checks currently cover serial boot, HJFS root, user, home,
-system name, installed `plan9.ini`, networking, and orderly shutdown. A result
-with an optional environmental failure is useful diagnostic evidence but is not
-promotable under this first conservative policy.
+system name, persistent timezone, an empty stock user home, installed
+`plan9.ini`, networking, and orderly shutdown. A result with an optional
+environmental failure is useful diagnostic evidence but is not promotable under
+this first conservative policy.
 
 ## Public and private evidence
 
-The original validation manifest is private build evidence. It deliberately
-contains absolute paths, the host kernel, and the exact diagnostic QEMU command.
-Those fields help reproduce a failure but are inappropriate for a portable
-public artifact.
+The original installation and validation manifests are private build evidence.
+They deliberately contain absolute paths, the host kernel, and exact QEMU
+commands. Those fields help reproduce a build or failure but are inappropriate
+for a portable public artifact.
+
+Promotion verifies the private installation manifest and writes an allow-listed
+public installation record. It retains timestamps, p9qemu and QEMU versions,
+the exact source commit, resolved answers, media/transcript/image digests,
+path-free QCOW2 metadata, host class, acceleration, and memory. It omits host
+paths, the kernel, and the path-bearing QEMU command while retaining the digest
+of the private source manifest.
 
 Promotion writes an allow-listed public validation manifest. It retains:
 
@@ -88,6 +99,8 @@ release-candidate-001/
     install.raw.log
     RUNNING.md
     manifest.json
+    installation/
+      manifest.json
     validation/
       manifest.json
       boot.raw.log
@@ -139,6 +152,7 @@ $ uv run python tools/build_release_candidate.py \
     --disk RUN/target.qcow2 \
     --answers RUN/answers.toml \
     --install-log RUN/console.raw.log \
+    --install-manifest RUN/install-manifest.json \
     --validation-manifest RUN/overlay-validation/manifest.json \
     --output-dir RUN/release-candidate-001 \
     --confirm-image-hygiene-reviewed
@@ -200,3 +214,25 @@ The output occupies approximately 773 MiB and remains in the retained run's
 The Windows free-space postflight remained above 173 GB and the WSL VHDX file
 length remained 219,465,908,224 bytes. This exercise proves the local mechanism;
 the explicit development-artifact limitation above still applies.
+
+That retained exercise predates the required installation-manifest input. It
+remains valid historical evidence for the mechanism tested at the time, but it
+cannot be rebuilt by the stricter current promotion command without a genuine
+source-bound installation manifest.
+
+## First fresh reference profile
+
+The first deliberate fresh build uses installer profile
+`9front-11554-amd64-hjfs-gmt-v1`. It preserves the conventional 9front system
+name `cirno` and user `glenda`, selects HJFS on a fresh 30 GiB QCOW2 target,
+uses automatic networking, and selects the exact 9front timezone name `GMT`.
+GMT is geographically neutral and has no daylight-saving transitions; users
+can change `/adm/timezone/local` after installation.
+
+The profile performs no post-install customization. It does not configure a
+password, authentication secret, Drawterm, or any additional remote service.
+The QEMU MAC address is runtime configuration rather than guest-image identity.
+Validation proves that `/adm/timezone/local` matches `/adm/timezone/GMT` and
+that the stock `/usr/glenda` home contains no files. The explicit promotion
+hygiene confirmation remains necessary because those bounded checks cannot
+prove the absence of every possible secret elsewhere in the guest filesystem.

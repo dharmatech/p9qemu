@@ -473,7 +473,10 @@ added only after a transport is selected and tested manually.
 6. Add an opt-in Linux integration test around the live validation tool.
 7. Decide whether the public interface should be `install --answers` and how
    Pexpect is packaged.
-8. Connect complete build provenance to the downloadable-image release process.
+8. Completed: bind each complete install to the exact source commit, media,
+   answers, raw transcript, QEMU versions and command, clean QCOW2 evidence,
+   and resulting image digest through a private installation manifest; require
+   and sanitize that manifest during local release-candidate promotion.
 9. Prototype a portable QEMU serial-socket transport.
 10. Evaluate Pexpect's Windows interfaces and Wexpect only if the portable
    transport is insufficient.

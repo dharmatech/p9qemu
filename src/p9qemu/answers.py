@@ -12,7 +12,13 @@ from p9qemu.errors import P9QemuError
 
 
 PROFILE_ID_11554_HJFS = "9front-11554-amd64"
+PROFILE_ID_11554_HJFS_GMT_V1 = "9front-11554-amd64-hjfs-gmt-v1"
 ISO_SHA256_11554 = "1dcfbb3ec221307329545a37d1562beeea1f4174f6df80d245e0a222893b3bb6"
+
+_SUPPORTED_TIMEZONES = {
+    PROFILE_ID_11554_HJFS: "US_Pacific",
+    PROFILE_ID_11554_HJFS_GMT_V1: "GMT",
+}
 
 
 @dataclass(frozen=True)
@@ -108,10 +114,12 @@ def _value(table: Mapping[str, Any], key: str, expected_type: type, label: str):
     return value
 
 
-def _require_supported(label: str, actual: object, expected: object) -> None:
+def _require_supported(
+    profile_id: str, label: str, actual: object, expected: object
+) -> None:
     if actual != expected:
         raise P9QemuError(
-            f"installer profile {PROFILE_ID_11554_HJFS!r} supports only "
+            f"installer profile {profile_id!r} supports only "
             f"{label}={expected!r}; got {actual!r}"
         )
 
@@ -173,9 +181,14 @@ def parse_answers(document: Mapping[str, Any]) -> InstallAnswers:
         ),
     )
 
+    expected_timezone = _SUPPORTED_TIMEZONES.get(answers.installer_profile)
+    if expected_timezone is None:
+        raise P9QemuError(
+            f"unsupported installer_profile={answers.installer_profile!r}"
+        )
+
     supported_values = {
         "schema": (answers.schema, 1),
-        "installer_profile": (answers.installer_profile, PROFILE_ID_11554_HJFS),
         "iso_sha256": (answers.iso_sha256, ISO_SHA256_11554),
         "disk.format": (answers.disk_format, "qcow2"),
         "disk.size": (answers.disk_size, "30G"),
@@ -195,7 +208,7 @@ def parse_answers(document: Mapping[str, Any]) -> InstallAnswers:
         "install.distribution_path": (answers.distribution_path, "/"),
         "install.system_name": (answers.system_name, "cirno"),
         "install.user": (answers.user, "glenda"),
-        "install.timezone": (answers.timezone, "US_Pacific"),
+        "install.timezone": (answers.timezone, expected_timezone),
         "network.method": (answers.network_method, "automatic"),
         "boot_disk.partition": (answers.boot_partition, "/dev/sd00/9fat"),
         "boot_disk.install_plan9_mbr": (answers.install_plan9_mbr, True),
@@ -205,7 +218,7 @@ def parse_answers(document: Mapping[str, Any]) -> InstallAnswers:
         ),
     }
     for label, (actual, expected) in supported_values.items():
-        _require_supported(label, actual, expected)
+        _require_supported(answers.installer_profile, label, actual, expected)
     return answers
 
 

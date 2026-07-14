@@ -35,10 +35,11 @@ class FakeTransport:
             "echo $user": "glenda\n",
             "pwd": "/usr/glenda\n",
             "cat /dev/sysname": "cirno",
+            "cmp /adm/timezone/US_Pacific /adm/timezone/local": "",
+            "walk -f /usr/glenda": "",
             "9fs 9fat": "",
             "cat /n/9fat/plan9.ini": (
-                "bootargs=local!/dev/sd00/fs -m 147\n"
-                "vgasize=text\nconsole=0\n"
+                "bootargs=local!/dev/sd00/fs -m 147\nvgasize=text\nconsole=0\n"
             ),
             "ip/ping -n 1 google.com": ping_output,
         }
@@ -66,6 +67,7 @@ def test_profile_is_derived_from_resolved_install_answers() -> None:
     assert validation.user == "glenda"
     assert validation.home == "/usr/glenda"
     assert validation.system_name == "cirno"
+    assert validation.timezone == "US_Pacific"
     assert validation.root_partition == "/dev/sd00/fs"
     assert "console=0" in validation.plan9_ini_values
 
@@ -82,6 +84,8 @@ def test_complete_guest_validation_checks_and_halts() -> None:
     assert result.status == "passed"
     assert transport.lines == ["", "glenda", "fshalt"]
     assert transport.commands[-1] == "ip/ping -n 1 google.com"
+    assert "cmp /adm/timezone/US_Pacific /adm/timezone/local" in transport.commands
+    assert "walk -f /usr/glenda" in transport.commands
     assert transport.waited[-1][0] == "shutdown.fshalt"
     assert "user\\[glenda\\]:" in transport.waited[1][1]
     assert messages[-1] == "Guest completed fshalt."
@@ -121,6 +125,19 @@ def test_deterministic_mismatch_fails_closed() -> None:
     transport = FakeTransport()
     transport.outputs["cat /dev/sysname"] = "wrong-name"
     with pytest.raises(P9QemuError, match="guest.sysname.*'cirno'"):
+        drive_guest_validation(
+            transport,
+            profile(),
+            network_mode="skip",
+            progress=lambda _message: None,
+        )
+    assert "fshalt" not in transport.lines
+
+
+def test_nonempty_home_fails_hygiene_check() -> None:
+    transport = FakeTransport()
+    transport.outputs["walk -f /usr/glenda"] = "/usr/glenda/private.txt\n"
+    with pytest.raises(P9QemuError, match="guest.home-clean.*expected no output"):
         drive_guest_validation(
             transport,
             profile(),

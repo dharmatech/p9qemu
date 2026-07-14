@@ -13,6 +13,15 @@ from p9qemu.instance import prepare_disk
 from p9qemu.installer import build_11554_hjfs_profile
 from p9qemu.media import sha256_file
 from p9qemu.pexpect_transport import run_pexpect_session
+from p9qemu.provenance import (
+    build_install_manifest,
+    qemu_img_check,
+    qemu_img_info,
+    query_tool_version,
+    utc_timestamp,
+    validate_source_commit,
+    write_json_new,
+)
 from p9qemu.qemu import build_automated_install_command, render_command
 
 
@@ -23,6 +32,14 @@ def _positive_int(value: str) -> int:
     return number
 
 
+def _require_complete_provenance(args: argparse.Namespace) -> tuple[Path, str]:
+    if args.install_manifest is None or args.source_commit is None:
+        raise P9QemuError(
+            "complete installations require --install-manifest and --source-commit"
+        )
+    return _absolute(args.install_manifest), validate_source_commit(args.source_commit)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Experimental Linux-only answer-driven 9front installer."
@@ -31,6 +48,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--iso", type=Path, required=True)
     parser.add_argument("--disk", type=Path, required=True)
     parser.add_argument("--console-log", type=Path, required=True)
+    parser.add_argument(
+        "--install-manifest",
+        type=Path,
+        help="new private provenance manifest required for a complete installation",
+    )
+    parser.add_argument(
+        "--source-commit",
+        help="complete Git commit required for a complete installation",
+    )
     parser.add_argument("--memory", type=_positive_int, default=1024, metavar="MIB")
     parser.add_argument("--accel", choices=("kvm", "tcg"), default="kvm")
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -81,10 +107,16 @@ def run(argv: list[str] | None = None) -> int:
         iso = _absolute(args.iso)
         disk = _absolute(args.disk)
         console_log = _absolute(args.console_log)
+        install_manifest: Path | None = None
+        source_commit: str | None = None
+        if args.complete:
+            install_manifest, source_commit = _require_complete_provenance(args)
         _require_existing_file(answers_path, "answer file")
         _require_existing_file(iso, "installation ISO")
         _require_new_file(disk, "target disk")
         _require_new_file(console_log, "console log")
+        if install_manifest is not None:
+            _require_new_file(install_manifest, "install manifest")
 
         answers = load_answers(answers_path)
         profile = build_11554_hjfs_profile(answers)
@@ -106,6 +138,7 @@ def run(argv: list[str] | None = None) -> int:
             memory_mib=args.memory,
             acceleration=acceleration,
         )
+        rendered = render_command(command, system="Linux")
 
         mode = "smoke test" if args.smoke_test else "complete installation"
         print(f"Experimental mode: {mode}")
@@ -113,12 +146,16 @@ def run(argv: list[str] | None = None) -> int:
         print(f"Verified ISO: {iso}")
         print(f"Fresh target disk: {disk}")
         print(f"Console log: {console_log}")
+        if install_manifest is not None:
+            print(f"Install manifest: {install_manifest}")
+            print(f"Source commit: {source_commit}")
         print(f"Acceleration: {acceleration.name}")
         print("\nWould start QEMU:\n" if args.dry_run else "\nStarting QEMU:\n")
-        print(render_command(command, system="Linux"), flush=True)
+        print(rendered, flush=True)
         if args.dry_run:
             return 0
 
+        started_at = utc_timestamp()
         prepare_disk(
             executables.image,
             disk,
@@ -134,7 +171,34 @@ def run(argv: list[str] | None = None) -> int:
         if result.stopped_before is not None:
             print(f"Smoke test passed; stopped safely before {result.stopped_before}.")
         else:
+            if install_manifest is None or source_commit is None:
+                raise P9QemuError("complete installation provenance was not resolved")
+            manifest = build_install_manifest(
+                started_at=started_at,
+                completed_at=utc_timestamp(),
+                source_commit=source_commit,
+                answers=answers,
+                answers_path=answers_path,
+                answers_sha256=sha256_file(answers_path),
+                iso_path=iso,
+                iso_sha256=actual_iso_digest.lower(),
+                image_path=disk,
+                image_sha256=sha256_file(disk),
+                console_log=console_log,
+                console_log_sha256=sha256_file(console_log),
+                host=host,
+                acceleration=acceleration,
+                memory_mib=args.memory,
+                qemu_system_version=query_tool_version(executables.system),
+                qemu_img_version=query_tool_version(executables.image),
+                qemu_command=command,
+                rendered_qemu_command=rendered,
+                image_info=qemu_img_info(executables.image, disk),
+                image_check=qemu_img_check(executables.image, disk),
+            )
+            write_json_new(install_manifest, manifest)
             print("Automated installation completed and QEMU exited.")
+            print(f"Install provenance manifest: {install_manifest}")
         return 0
     except P9QemuError as error:
         print(f"automated_install: {error}", file=sys.stderr)
