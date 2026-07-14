@@ -331,6 +331,10 @@ are described in `01-downloadable-post-install-images.md`. Commands such as
 response to concrete workflows. `p9qemu` should remain a focused,
 comprehensible utility rather than becoming a general VM manager.
 
+Answer-driven automated installation and the provenance records for producing
+those base images are described in
+[`04-automated-installation-answer-files.md`](04-automated-installation-answer-files.md).
+
 ## Resolved version 1 decisions
 
 1. The compressed archive's SHA-256 digest is

@@ -122,6 +122,10 @@ The long-term goal should be a reproducible or at least repeatable image build.
 An initially manual build is acceptable only when every step is recorded well
 enough to audit and repeat.
 
+The proposed answer-file format, automated installer, transcript, and resolved
+build manifest are described in
+[`04-automated-installation-answer-files.md`](04-automated-installation-answer-files.md).
+
 ## Image hygiene and first-run identity
 
 Published images must be treated as distribution artifacts rather than copies
@@ -231,4 +235,3 @@ tests.
 7. How should concurrent instances receive unique MAC addresses and host ports?
 8. What constitutes a reproducible and auditable official image build?
 9. How should cached bases be garbage-collected without breaking overlays?
-
