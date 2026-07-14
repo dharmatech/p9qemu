@@ -143,6 +143,7 @@ def _string(value: object, label: str) -> str:
 def _require_validation_checkpoints(
     document: Mapping[str, Any],
     *,
+    source_commit: str,
     image_sha256: str,
     answers_sha256: str,
 ) -> None:
@@ -150,6 +151,9 @@ def _require_validation_checkpoints(
         raise P9QemuError("unsupported validation manifest schema or kind")
     if document.get("status") != "passed":
         raise P9QemuError("release candidates require validation status 'passed'")
+    p9qemu = _mapping(document.get("p9qemu"), "validation.p9qemu")
+    if p9qemu.get("commit") != source_commit:
+        raise P9QemuError("validation source commit does not match the candidate")
 
     image = _mapping(document.get("image"), "image")
     before = _string(image.get("sha256_before"), "image.sha256_before")
@@ -301,7 +305,10 @@ def sanitize_validation_manifest(
         "status": document.get("status"),
         "started_at": document.get("started_at"),
         "completed_at": document.get("completed_at"),
-        "p9qemu": {"version": p9qemu.get("version")},
+        "p9qemu": {
+            "version": p9qemu.get("version"),
+            "commit": p9qemu.get("commit"),
+        },
         "answers": {
             "sha256": answers.get("sha256"),
             "resolved": answers.get("resolved"),
@@ -836,6 +843,7 @@ def inspect_candidate_inputs(
     validation = load_json_object(inputs.validation_manifest, "validation manifest")
     _require_validation_checkpoints(
         validation,
+        source_commit=inputs.source_commit,
         image_sha256=image_sha256,
         answers_sha256=answers_sha256,
     )

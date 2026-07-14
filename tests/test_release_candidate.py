@@ -119,7 +119,7 @@ def _validation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path]:
         "status": "passed",
         "started_at": "2026-07-14T01:00:00Z",
         "completed_at": "2026-07-14T01:01:00Z",
-        "p9qemu": {"version": "0.1.0"},
+        "p9qemu": {"version": "0.1.0", "commit": "a" * 40},
         "answers": {
             "sha256": answers_digest,
             "resolved": asdict(load_answers(answers)),
@@ -365,6 +365,17 @@ def test_release_candidate_rejects_unbound_installation_manifest(
     document = json.loads(inputs.install_manifest.read_text(encoding="utf-8"))
     document["p9qemu"]["commit"] = "b" * 40
     inputs.install_manifest.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(P9QemuError, match="source commit does not match"):
+        build_release_candidate(inputs)
+
+
+def test_release_candidate_rejects_unbound_validation_manifest(
+    tmp_path: Path,
+) -> None:
+    inputs = _inputs(tmp_path)
+    document = json.loads(inputs.validation_manifest.read_text(encoding="utf-8"))
+    document["p9qemu"]["commit"] = "b" * 40
+    inputs.validation_manifest.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(P9QemuError, match="source commit does not match"):
         build_release_candidate(inputs)
 

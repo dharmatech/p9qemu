@@ -147,6 +147,20 @@ def test_nonempty_home_fails_hygiene_check() -> None:
     assert "fshalt" not in transport.lines
 
 
+def test_serial_echo_is_ignored_but_command_output_is_not() -> None:
+    transport = FakeTransport()
+    command = "cmp /adm/timezone/US_Pacific /adm/timezone/local"
+    transport.outputs[command] = command + "\n"
+    result = drive_guest_validation(
+        transport,
+        profile(),
+        network_mode="skip",
+        progress=lambda _message: None,
+    )
+    timezone = next(check for check in result.checks if check.name == "guest.timezone")
+    assert timezone.status == "passed"
+
+
 class FailingChild:
     def __init__(self, error: Exception) -> None:
         self.error = error

@@ -151,8 +151,12 @@ def _validated_empty_command(
     detail: str,
 ) -> None:
     output = transport.command(state, command, SHELL_PROMPT, 60)
-    if output.strip():
-        recent = output[-500:].replace("\r", "\\r").replace("\n", "\\n")
+    lines = output.replace("\r", "").splitlines()
+    if lines and lines[0].strip() == command:
+        lines = lines[1:]
+    unexpected = "\n".join(lines).strip()
+    if unexpected:
+        recent = unexpected[-500:].replace("\n", "\\n")
         raise GuestValidationError(
             f"guest validation state {state!r} expected no output; "
             f"recent output: {recent!r}",

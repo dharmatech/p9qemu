@@ -36,6 +36,8 @@ Promotion fails unless:
 - the source revision is a complete 40-character Git commit;
 - the installation manifest binds that source revision to the supplied answer
   file, verified media, transcript, clean QCOW2, and resulting image digest;
+- the validation manifest records the same source revision, preventing a
+  candidate from mixing installer and validator implementations;
 - the supplied image and answer digests match the validation manifest;
 - validation status is `passed`, every required guest check passed, and no
   validation error was recorded;
@@ -66,7 +68,8 @@ of the private source manifest.
 
 Promotion writes an allow-listed public validation manifest. It retains:
 
-- timestamps, p9qemu and QEMU versions, and a limited host description;
+- timestamps, the exact source commit, p9qemu and QEMU versions, and a limited
+  host description;
 - resolved answers and their digest;
 - path-free QCOW2 metadata and the immutable image digest;
 - acceleration, memory, guest checks, and network-check mode; and

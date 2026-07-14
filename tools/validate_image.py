@@ -23,6 +23,7 @@ from p9qemu.provenance import (
     query_tool_version,
     require_unchanged_image,
     utc_timestamp,
+    validate_source_commit,
     write_json_new,
     write_text_new,
 )
@@ -44,7 +45,9 @@ class EventRecorder:
         print(message, flush=True)
 
     def json_lines(self) -> str:
-        return "".join(json.dumps(event, sort_keys=True) + "\n" for event in self.events)
+        return "".join(
+            json.dumps(event, sort_keys=True) + "\n" for event in self.events
+        )
 
 
 @dataclass(frozen=True)
@@ -78,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--answers", type=Path, required=True)
     parser.add_argument("--disk", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--source-commit",
+        required=True,
+        help="complete Git commit identifying the validation implementation",
+    )
     parser.add_argument("--memory", type=_positive_int, default=2048, metavar="MIB")
     parser.add_argument("--accel", choices=("kvm", "tcg"), default="kvm")
     parser.add_argument(
@@ -187,6 +195,7 @@ def _run_validation(
     command: list[str],
     rendered: str,
     network_mode: NetworkMode,
+    source_commit: str,
 ) -> int:
     recorder = EventRecorder()
     started_at = utc_timestamp()
@@ -268,6 +277,7 @@ def _run_validation(
         status=status,
         started_at=started_at,
         completed_at=completed_at,
+        source_commit=source_commit,
         answers=answers,
         answers_sha256=sha256_file(paths.answers),
         base_image=disk,
@@ -318,6 +328,7 @@ def run(argv: list[str] | None = None) -> int:
         _require_existing_file(answers_path, "answer file")
         _require_existing_file(disk, "base disk image")
         _require_new_directory(output_dir)
+        source_commit = validate_source_commit(args.source_commit)
         answers = load_answers(answers_path)
         executables = discover_qemu(host)
         acceleration = resolve_acceleration(args.accel, host)
@@ -336,6 +347,7 @@ def run(argv: list[str] | None = None) -> int:
         print(f"Immutable base image: {disk}")
         print(f"New evidence directory: {output_dir}")
         print(f"Network check: {args.network_check}")
+        print(f"Source commit: {source_commit}")
         print(f"Acceleration: {acceleration.name}")
         print("\nWould start QEMU:\n" if args.dry_run else "\nStarting QEMU:\n")
         print(rendered, flush=True)
@@ -353,6 +365,7 @@ def run(argv: list[str] | None = None) -> int:
             command=command,
             rendered=rendered,
             network_mode=args.network_check,
+            source_commit=source_commit,
         )
     except P9QemuError as error:
         print(f"validate_image: {error}", file=sys.stderr)

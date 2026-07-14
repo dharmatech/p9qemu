@@ -79,6 +79,7 @@ def test_validation_manifest_records_immutability_and_check_categories() -> None
         status=validation.status,
         started_at="2026-07-14T01:00:00Z",
         completed_at="2026-07-14T01:01:00Z",
+        source_commit="a" * 40,
         answers=answers,
         answers_sha256="a" * 64,
         base_image=Path("base.qcow2"),
@@ -106,6 +107,7 @@ def test_validation_manifest_records_immutability_and_check_categories() -> None
     assert manifest["overlay"]["retained_on_failure"] is False
     assert manifest["validation"]["checks"][1]["category"] == "environmental"
     assert manifest["validation"]["failure_category"] is None
+    assert manifest["p9qemu"]["commit"] == "a" * 40
 
 
 def test_install_manifest_binds_source_media_answers_image_and_log() -> None:
