@@ -58,7 +58,7 @@ _REQUIRED_VALIDATION_CHECKS = {
     "guest.home",
     "guest.sysname",
     "guest.timezone",
-    "guest.home-clean",
+    "guest.home-baseline",
     "guest.plan9-ini",
     "network-ping",
     "orderly-shutdown",

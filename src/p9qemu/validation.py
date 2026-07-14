@@ -49,6 +49,7 @@ class GuestValidationProfile:
     timezone: str
     root_partition: str
     plan9_ini_values: tuple[str, ...]
+    stock_home_files: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -93,10 +94,11 @@ def build_guest_validation_profile(
 ) -> GuestValidationProfile:
     """Resolve expected guest state from qualified installation answers."""
 
+    home = f"/usr/{answers.user}"
     return GuestValidationProfile(
         profile_id=answers.installer_profile,
         user=answers.user,
-        home=f"/usr/{answers.user}",
+        home=home,
         system_name=answers.system_name,
         timezone=answers.timezone,
         root_partition=answers.hjfs_partition,
@@ -104,6 +106,13 @@ def build_guest_validation_profile(
             f"bootargs=local!{answers.hjfs_partition} -m {answers.hjfs_cache_mib}",
             f"vgasize={answers.vgasize}",
             f"console={answers.console}",
+        ),
+        stock_home_files=(
+            f"{home}/bin/rc/riostart",
+            f"{home}/lib/L.webcookies",
+            f"{home}/lib/plumbing",
+            f"{home}/lib/profile",
+            f"{home}/lib/webcookies",
         ),
     )
 
@@ -151,9 +160,7 @@ def _validated_empty_command(
     detail: str,
 ) -> None:
     output = transport.command(state, command, SHELL_PROMPT, 60)
-    lines = output.replace("\r", "").splitlines()
-    if lines and lines[0].strip() == command:
-        lines = lines[1:]
+    lines = _command_output_lines(output, command)
     unexpected = "\n".join(lines).strip()
     if unexpected:
         recent = unexpected[-500:].replace("\n", "\\n")
@@ -164,6 +171,51 @@ def _validated_empty_command(
             state=state,
         )
     checks.append(_passed(state, detail))
+
+
+def _command_output_lines(output: str, command: str) -> list[str]:
+    lines = output.replace("\r", "").splitlines()
+    if lines and lines[0].strip() == command:
+        lines = lines[1:]
+    return [line.strip() for line in lines if line.strip()]
+
+
+def _validated_stock_home(
+    transport: GuestValidationTransport,
+    checks: list[ValidationCheck],
+    profile: GuestValidationProfile,
+) -> None:
+    state = "guest.home-baseline"
+    command = f"walk -f {profile.home}"
+    output = transport.command(state, command, SHELL_PROMPT, 60)
+    paths = set(_command_output_lines(output, command))
+    required = set(profile.stock_home_files)
+    missing = sorted(required - paths)
+    runtime_patterns = (
+        re.compile(
+            rf"^{re.escape(profile.home)}/tmp/ts\."
+            rf"{re.escape(profile.system_name)}\.\d+$"
+        ),
+        re.compile(rf"^{re.escape(profile.home)}/tmp/xxx$"),
+    )
+    unexpected = sorted(
+        path
+        for path in paths - required
+        if not any(pattern.fullmatch(path) for pattern in runtime_patterns)
+    )
+    if missing or unexpected:
+        raise GuestValidationError(
+            f"guest validation state {state!r} did not match the pinned stock home; "
+            f"missing={missing!r}, unexpected={unexpected!r}",
+            category="deterministic",
+            state=state,
+        )
+    checks.append(
+        _passed(
+            state,
+            "home contains only the pinned stock files and known boot-time temporaries",
+        )
+    )
 
 
 def drive_guest_validation(
@@ -239,13 +291,7 @@ def drive_guest_validation(
         command=f"cmp /adm/timezone/{profile.timezone} /adm/timezone/local",
         detail=f"persistent timezone is {profile.timezone}",
     )
-    _validated_empty_command(
-        transport,
-        checks,
-        state="guest.home-clean",
-        command=f"walk -f {profile.home}",
-        detail=f"{profile.home} contains no personal files",
-    )
+    _validated_stock_home(transport, checks, profile)
     transport.command("guest.mount-9fat", "9fs 9fat", SHELL_PROMPT, 60)
     _validated_command(
         transport,

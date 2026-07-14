@@ -47,7 +47,7 @@ Promotion fails unless:
 - copied public text passes the host-path and common-secret scan.
 
 The required guest checks currently cover serial boot, HJFS root, user, home,
-system name, persistent timezone, an empty stock user home, installed
+system name, persistent timezone, the release-pinned stock user-home inventory, installed
 `plan9.ini`, networking, and orderly shutdown. A result with an optional
 environmental failure is useful diagnostic evidence but is not promotable under
 this first conservative policy.
@@ -236,6 +236,7 @@ The profile performs no post-install customization. It does not configure a
 password, authentication secret, Drawterm, or any additional remote service.
 The QEMU MAC address is runtime configuration rather than guest-image identity.
 Validation proves that `/adm/timezone/local` matches `/adm/timezone/GMT` and
-that the stock `/usr/glenda` home contains no files. The explicit promotion
-hygiene confirmation remains necessary because those bounded checks cannot
-prove the absence of every possible secret elsewhere in the guest filesystem.
+that `/usr/glenda` contains only the pinned 11554 stock files plus the known
+boot-time temporary patterns. The explicit promotion hygiene confirmation
+remains necessary because those bounded checks cannot prove the absence of
+every possible secret elsewhere in the guest filesystem.

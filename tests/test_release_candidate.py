@@ -184,7 +184,7 @@ def _validation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path]:
                     "guest.home",
                     "guest.sysname",
                     "guest.timezone",
-                    "guest.home-clean",
+                    "guest.home-baseline",
                     "guest.plan9-ini",
                     "network-ping",
                     "orderly-shutdown",
