@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from typing import Literal
 
 from p9qemu.answers import (
     ISO_SHA256_11554,
@@ -15,6 +16,7 @@ from p9qemu.errors import P9QemuError
 
 INSTALLER_PROFILE_REVISION_11554 = 1
 INSTALLER_SOURCE_REVISION_11554 = "db4a6fa3843734802a6870bbd93b1a97e2c37b2b"
+SendMode = Literal["line", "raw"]
 
 _ANSI_ESCAPE = re.compile(
     r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\)|[@-_])"
@@ -45,6 +47,7 @@ class InstallerStep:
     state: str
     pattern: str
     response: str | None
+    send_mode: SendMode = "line"
     timeout_seconds: int = 60
 
 
@@ -54,6 +57,7 @@ class InstallerAction:
 
     state: str
     response: str
+    send_mode: SendMode
 
 
 @dataclass(frozen=True)
@@ -80,12 +84,14 @@ def _literal_step(
     prompt: str,
     response: str | None,
     *,
+    send_mode: SendMode = "line",
     timeout_seconds: int = 60,
 ) -> InstallerStep:
     return InstallerStep(
         state=state,
         pattern=re.escape(prompt) + r"[ \t]*",
         response=response,
+        send_mode=send_mode,
         timeout_seconds=timeout_seconds,
     )
 
@@ -106,8 +112,14 @@ def build_11554_hjfs_profile(answers: InstallAnswers) -> InstallerProfile:
 
     steps = (
         InstallerStep(
+            "boot.interrupt",
+            r"bootfile=/amd64/9pc64",
+            " ",
+            send_mode="raw",
+        ),
+        InstallerStep(
             "boot.console",
-            r"bootfile=/amd64/9pc64\n>",
+            r"(?m)^>",
             f"console={answers.console}",
         ),
         InstallerStep("boot.kernel", r"(?m)^>", "boot"),
@@ -132,6 +144,16 @@ def build_11554_hjfs_profile(answers: InstallAnswers) -> InstallerProfile:
         ),
         _literal_step("menu.partdisk", "Task to do [partdisk]:", "partdisk"),
         _literal_step(
+            "partdisk.target_disk",
+            "sd00 - QEMU QEMU HARDDISK 2.5+",
+            None,
+        ),
+        _literal_step(
+            "partdisk.install_media",
+            "sd01 - QEMU QEMU CD-ROM 2.5+",
+            None,
+        ),
+        _literal_step(
             "partdisk.target",
             "Disk to partition (sd00, sd01)[no default]:",
             answers.disk_target,
@@ -141,6 +163,12 @@ def build_11554_hjfs_profile(answers: InstallAnswers) -> InstallerProfile:
             "Install mbr or gpt (mbr, gpt)[no default]:",
             answers.partition_table,
         ),
+        InstallerStep(
+            "partdisk.layout",
+            r"(?m)^'\* p1\s+0 3916\s+"
+            r"\(3916 cylinders, 29\.99 GB\) PLAN9[ \t]*",
+            None,
+        ),
         InstallerStep("fdisk.write", r"(?m)^>>>[ \t]*", "w"),
         InstallerStep("fdisk.quit", r"(?m)^>>>[ \t]*", "q"),
         _literal_step("menu.prepdisk", "Task to do [prepdisk]:", "prepdisk"),
@@ -148,6 +176,11 @@ def build_11554_hjfs_profile(answers: InstallAnswers) -> InstallerProfile:
             "prepdisk.partition",
             "Plan 9 partition to subdivide (/dev/sd00/plan9)[/dev/sd00/plan9]:",
             "/dev/sd00/plan9",
+        ),
+        InstallerStep(
+            "prepdisk.layout",
+            r"(?m)^fs 62705676[ \t]*",
+            None,
         ),
         InstallerStep("prep.write", r"(?m)^>>>[ \t]*", "w"),
         InstallerStep("prep.quit", r"(?m)^>>>[ \t]*", "q"),
@@ -262,7 +295,11 @@ class InstallerStateMachine:
         self._position += 1
         if expected.response is None:
             return None
-        return InstallerAction(state=state, response=expected.response)
+        return InstallerAction(
+            state=state,
+            response=expected.response,
+            send_mode=expected.send_mode,
+        )
 
 
 def replay_transcript(text: str, profile: InstallerProfile) -> ReplayResult:
