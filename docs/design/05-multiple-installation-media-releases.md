@@ -186,6 +186,11 @@ Publishing an entry and making it recommended are intentionally separate
 decisions. A new release may remain available for opt-in testing before it is
 promoted.
 
+Installer compatibility and automated-image support are also separate gates.
+The required inspection, manual baseline run, automated validation, and
+disk-space controls are defined in
+[`06-new-release-qualification.md`](06-new-release-qualification.md).
+
 Media tags and assets are immutable. If bytes change for any reason, publish a
 new tag or corrected identifier and retain the old provenance record.
 

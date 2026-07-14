@@ -152,6 +152,11 @@ ordinary prompts. Timeout messages should name the current stage, show the
 recent console tail, preserve all logs, and leave the failed image unpublished
 for inspection.
 
+The procedure for inspecting a new upstream installer, deciding whether a
+profile can be reused, and certifying it for another exact media digest is
+described in
+[`06-new-release-qualification.md`](06-new-release-qualification.md).
+
 ## Provenance bundle
 
 An automated install should produce a sidecar build directory such as:
