@@ -37,16 +37,20 @@ DEFAULT_PORT_FORWARDS = (
 )
 
 
-def _drive_path(path: Path, label: str) -> str:
+def _option_path(path: Path, label: str, option: str) -> str:
     value = str(path)
     if "," in value:
         raise P9QemuError(
             f"{label} path contains a comma, which version 1 cannot safely "
-            f"represent in a QEMU -drive option: {value}"
+            f"represent in a QEMU {option} option: {value}"
         )
     if "\n" in value or "\r" in value or "\x00" in value:
         raise P9QemuError(f"{label} path contains unsupported characters: {value!r}")
     return value
+
+
+def _drive_path(path: Path, label: str) -> str:
+    return _option_path(path, label, "-drive")
 
 
 def _base_command(
@@ -104,6 +108,40 @@ def build_install_command(
         f"if=none,id=vd1,file={iso_value},format=raw",
         "-device",
         "scsi-cd,drive=vd1,bootindex=0",
+    ]
+
+
+def build_automated_install_command(
+    executable: str,
+    *,
+    disk: Path,
+    iso: Path,
+    console_log: Path,
+    memory_mib: int,
+    acceleration: Acceleration,
+    mac_address: str = DEFAULT_MAC_ADDRESS,
+) -> list[str]:
+    """Build the experimental dedicated-serial automated-install command."""
+
+    log_value = _option_path(console_log, "console log", "-chardev")
+    return [
+        *build_install_command(
+            executable,
+            disk=disk,
+            iso=iso,
+            memory_mib=memory_mib,
+            acceleration=acceleration,
+            mac_address=mac_address,
+        ),
+        "-display",
+        "none",
+        "-monitor",
+        "none",
+        "-chardev",
+        f"stdio,id=serial0,logfile={log_value},logappend=off",
+        "-serial",
+        "chardev:serial0",
+        "-no-reboot",
     ]
 
 

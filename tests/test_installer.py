@@ -36,11 +36,12 @@ def test_console_normalization_removes_ansi_backspace_and_cr() -> None:
 def test_profile_replays_the_manual_reference_transcript() -> None:
     transcript = REFERENCE_TRANSCRIPT.read_text(encoding="utf-8")
     result = replay_transcript(transcript, profile())
-    assert result.states[0] == "boot.console"
+    assert result.states[0] == "boot.interrupt"
     assert result.states[-1] == "finish.rebooting"
     assert len(result.states) == len(profile().steps)
 
     actions = {action.state: action.response for action in result.actions}
+    assert actions["boot.interrupt"] == " "
     assert actions["boot.console"] == "console=0"
     assert actions["shell.start_installer"] == "inst/start"
     assert actions["tzsetup.timezone"] == "US_Pacific"
@@ -81,6 +82,25 @@ def test_menu_tasks_are_selected_explicitly() -> None:
     assert actual == expected_tasks
 
 
+def test_boot_interrupt_and_answer_responses_use_distinct_send_modes() -> None:
+    actions = {
+        action.state: action
+        for action in replay_transcript(
+            REFERENCE_TRANSCRIPT.read_text(encoding="utf-8"), profile()
+        ).actions
+    }
+    assert actions["boot.interrupt"].send_mode == "raw"
+    assert actions["boot.console"].send_mode == "line"
+
+
+def test_destructive_writes_follow_topology_and_layout_checkpoints() -> None:
+    states = [step.state for step in profile().steps]
+    assert states.index("partdisk.target_disk") < states.index("partdisk.target")
+    assert states.index("partdisk.install_media") < states.index("partdisk.target")
+    assert states.index("partdisk.layout") < states.index("fdisk.write")
+    assert states.index("prepdisk.layout") < states.index("prep.write")
+
+
 def test_copy_stage_has_a_longer_timeout() -> None:
     steps = {step.state: step for step in profile().steps}
     assert steps["menu.ndbsetup"].timeout_seconds == 1800
@@ -91,11 +111,11 @@ def test_state_machine_rejects_out_of_order_observation() -> None:
     machine = InstallerStateMachine(profile())
     with pytest.raises(
         P9QemuError,
-        match="unexpected installer state 'menu.configfs'.*expected 'boot.console'",
+        match="unexpected installer state 'menu.configfs'.*expected 'boot.interrupt'",
     ):
         machine.observe("menu.configfs")
     assert machine.expected is not None
-    assert machine.expected.state == "boot.console"
+    assert machine.expected.state == "boot.interrupt"
 
 
 def test_state_machine_rejects_observation_after_completion() -> None:

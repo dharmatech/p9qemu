@@ -6,6 +6,7 @@ from p9qemu.errors import P9QemuError
 from p9qemu.host import Acceleration
 from p9qemu.qemu import (
     DEFAULT_PORT_FORWARDS,
+    build_automated_install_command,
     build_install_command,
     build_start_command,
     render_command,
@@ -68,6 +69,43 @@ def test_start_command_includes_kvm_and_all_known_forwards() -> None:
     network = command[-1]
     for forward in DEFAULT_PORT_FORWARDS:
         assert forward.qemu_value() in network
+
+
+def test_automated_install_has_dedicated_logged_serial_without_monitor() -> None:
+    console_log = Path("run") / "console.raw.log"
+    command = build_automated_install_command(
+        "qemu-system-x86_64",
+        disk=Path("target.qcow2"),
+        iso=Path("9front.iso"),
+        console_log=console_log,
+        memory_mib=1024,
+        acceleration=KVM,
+    )
+    assert command[-9:] == [
+        "-display",
+        "none",
+        "-monitor",
+        "none",
+        "-chardev",
+        f"stdio,id=serial0,logfile={console_log},logappend=off",
+        "-serial",
+        "chardev:serial0",
+        "-no-reboot",
+    ]
+    assert "-nographic" not in command
+    assert "mon:stdio" not in command
+
+
+def test_comma_in_console_log_path_is_rejected() -> None:
+    with pytest.raises(P9QemuError, match="console log path contains a comma"):
+        build_automated_install_command(
+            "qemu-system-x86_64",
+            disk=Path("target.qcow2"),
+            iso=Path("9front.iso"),
+            console_log=Path("bad,log.txt"),
+            memory_mib=1024,
+            acceleration=KVM,
+        )
 
 
 def test_posix_rendering_is_copyable() -> None:
