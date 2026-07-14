@@ -240,3 +240,62 @@ that `/usr/glenda` contains only the pinned 11554 stock files plus the known
 boot-time temporary patterns. The explicit promotion hygiene confirmation
 remains necessary because those bounded checks cannot prove the absence of
 every possible secret elsewhere in the guest filesystem.
+
+### Fresh GMT candidate exercise (2026-07-14)
+
+The first deliberate fresh run exposed two useful validation mistakes before
+promotion. Plan 9's serial terminal echoed the `cmp` command, so a helper that
+expected literally empty output rejected an otherwise successful GMT
+comparison. The next live check showed that a stock install correctly populates
+`/usr/glenda`; an empty-home policy would have rejected distribution files as
+personal state. PR #13 changed the validator to remove only an exact echoed
+command line and replaced the empty-home assumption with a release-pinned stock
+inventory plus known boot-time temporary patterns.
+
+The non-canonical diagnostic QCOW2 and its failed overlays were deleted after
+the evidence was retained. The authoritative build then started again from a
+fresh target and used merged source commit
+`a245a026b90e6ec75d3c10e0dfce6f76af196c3c` for both installation and
+validation.
+
+The authoritative run established:
+
+- answer-file SHA-256
+  `c0a2ab375a50a22cebda4d45dbb6481630d236d6aaff6c58cb77481fd81c294e`;
+- verified installation-media SHA-256
+  `1dcfbb3ec221307329545a37d1562beeea1f4174f6df80d245e0a222893b3bb6`;
+- raw installation-transcript SHA-256
+  `72dffd5c2a57deb0c86ea56a8222673311e08b010615fc6a1012559c38a267c2`;
+- private installation-manifest SHA-256
+  `f4daaa9946b9a20a5f13740486b9176a9455e13e2c54924df2de57f1f892462d`;
+- QCOW2 size 559,022,080 bytes, virtual size 32,212,254,720 bytes, and
+  SHA-256
+  `0bed74080dd8e3ece1d50731ef7766425e3b806c89e215ea8951cc006fbf25ca`;
+- private validation-manifest SHA-256
+  `74d218d404114a14916ba432675a355ad8bd5c6d648367a5008340158e547eed`;
+- ten passing guest checks: serial boot, HJFS root, user, home, system name,
+  GMT, stock-home inventory, `plan9.ini`, required networking, and orderly
+  shutdown; and
+- unchanged base-image hashes and removal of every successful overlay.
+
+Local promotion produced candidate
+`p9qemu-9front-11554-amd64-hjfs-gmt-001`. The bundle manifest has SHA-256
+`5d0d4ae8f5fcb10834979e78977633b456be1136109e9dc9cad0f5cb8271cecb`.
+The deterministic tar-gzip is 250,532,383 bytes with SHA-256
+`b9b778a2fe3ebbd8495d026d6ca4d1d4b73d7d422327dad58d3024a756b7e10d`.
+Its checksum, ten-file archive inventory, manifest-bound artifact digests, and
+independent public-text privacy scan all passed.
+
+For a clean-room Linux check, the exact archive was independently extracted,
+its answer, manifest, and QCOW2 hashes were rechecked, and the extracted image
+passed `qemu-img check` plus the same required-network immutable-overlay boot.
+The disposable extracted QCOW2 was then deleted while the validation evidence
+was retained.
+
+The Windows free-space postflight was 173,548,670,976 bytes. The Ubuntu WSL
+VHDX remained 219,465,908,224 bytes, WSL reported 886,240,436,224 bytes
+available, the authoritative run occupied approximately 1.3 GiB, and the
+retained diagnostic evidence occupied 164 KiB. No `.part` file or validation
+overlay remained. This is still a local-only candidate: nothing was uploaded,
+and Windows boot testing of the exact candidate remains a separate publication
+gate.
