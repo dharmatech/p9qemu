@@ -2,15 +2,16 @@
 
 ## Status
 
-Future direction beyond version 1. The initial proof of concept should target
-Linux and one pinned 9front release. This design does not yet add a runtime
-dependency or commit to Windows automation.
+Experimental work beyond version 1. The prototype targets Linux and one pinned
+9front release. It does not commit to Windows automation or expose a public CLI
+option.
 
-The first internal implementation slice now provides a strict parser for the
-11554 HJFS reference answers, an ISO-bound installer-profile revision, console
-normalization, and state-machine replay against the digest-pinned manual
-transcript. It does not yet launch QEMU, control a live installer, add Pexpect,
-or expose a public CLI option.
+The internal implementation now provides a strict parser for the 11554 HJFS
+reference answers, an ISO-bound installer profile, console normalization,
+state-machine replay against the digest-pinned manual transcript, and a live
+Linux Pexpect transport. Pexpect is currently a development dependency only.
+The live transport has passed a non-destructive boot smoke test, but it has not
+yet completed an unattended installation or produced a publishable image.
 
 ## Motivation
 
@@ -46,6 +47,29 @@ That experiment established that:
   controller; and
 - graphical configuration can be applied temporarily at boot without changing
   the installed disk's console-oriented `plan9.ini`.
+
+### Live transport checkpoint (2026-07-14)
+
+The first live Pexpect smoke test used the verified 11554 ISO, KVM, a fresh
+30 GiB sparse QCOW2 disk, and the reference HJFS answer file. The driver:
+
+1. recognized the ISO's `bootfile=/amd64/9pc64` marker;
+2. interrupted 9boot with a raw space character;
+3. set `console=0` and booted the kernel;
+4. answered the boot prompts and ran `inst/start`; and
+5. reached `Task to do [configfs]:` before stopping without sending `configfs`.
+
+The smoke boundary therefore exercised no installer task and made no partition
+or filesystem changes. The raw QEMU character-device log independently
+contained the boot marker, Plan 9 banner, `term% inst/start`, and the first
+installer menu. The disposable target occupied about 196 KiB before it and its
+log were removed.
+
+One console-setting result is important: `-display none` produced no early ISO
+serial output and timed out safely at the first state. Replacing only that
+setting with `-nographic` exposed 9boot and allowed the smoke test to pass. The
+working profile kept `-monitor none`, a dedicated logged `stdio` character
+backend, `-serial chardev:serial0`, and `-no-reboot`.
 
 The graphical installer can also be partially recorded with Plan 9 `tee`, but
 it is less suitable for exact automation. `inst/start` uses stderr as its live
@@ -236,12 +260,12 @@ release-specific installer state machine
 Pexpect/QEMU serial transport
 ```
 
-Pexpect would be a new runtime dependency, while the version 1 design currently
-uses only the Python standard library. The prototype should not add it to the
-main package until the feature is approved for the public CLI. Later choices
-include making it a normal small dependency, exposing automation through an
-optional package extra, or replacing it with a compact transport built on
-standard-library sockets.
+Pexpect is currently a development-only dependency, so ordinary `p9qemu`
+installations retain the version 1 standard-library-only runtime. If the
+feature is approved for the public CLI, later choices include making Pexpect a
+normal small dependency, exposing automation through an optional package
+extra, or replacing it with a compact transport built on standard-library
+sockets.
 
 If adopted, dependency changes must be made through `uv` and recorded in both
 `pyproject.toml` and `uv.lock`.
@@ -250,14 +274,13 @@ If adopted, dependency changes must be made through `uv` and recorded in both
 
 The automation channel should be dedicated to guest serial traffic. A
 multiplexed human QEMU monitor introduces control sequences and unrelated
-prompts that make matching less reliable. The automation profile should
-investigate an explicit character backend, a dedicated serial device, and a
-disabled or separately connected monitor.
+prompts that make matching less reliable. The live smoke test validated an
+explicit character backend, a dedicated serial device, and a disabled monitor.
 
 Useful QEMU facilities include:
 
 - character-backend `logfile` and `logappend` options;
-- a non-graphical display profile for the console build;
+- `-nographic` for early ISO and 9boot console output;
 - a dedicated serial backend rather than `mon:stdio`; and
 - `-no-reboot`, which makes QEMU exit when the installer's final reboot occurs.
 
@@ -377,10 +400,12 @@ added only after a transport is selected and tested manually.
 
 ## Proposed implementation stages
 
-1. Sanitize the successful 11554 console transcript and use it as a golden
-   development fixture.
-2. Define the minimal semantic answer schema and resolved manifest.
-3. Build a private Linux-only Pexpect prototype for that exact ISO digest.
+1. Completed: sanitize the successful 11554 console transcript and use it as a
+   golden development fixture.
+2. Completed: define the minimal semantic answer schema and release-specific
+   installer profile.
+3. Completed: build a private Linux-only Pexpect prototype for that exact ISO
+   digest and validate it through the first installer menu.
 4. Complete, boot, inspect, and halt a disposable automated image.
 5. Add transcript-driven unit tests and an opt-in Linux integration test.
 6. Decide whether the public interface should be `install --answers` and how
