@@ -125,6 +125,9 @@ enough to audit and repeat.
 The proposed answer-file format, automated installer, transcript, and resolved
 build manifest are described in
 [`04-automated-installation-answer-files.md`](04-automated-installation-answer-files.md).
+The local-only promotion boundary, sanitized release manifest, deterministic
+archive, and archive round-trip verification are described in
+[`09-release-candidate-promotion.md`](09-release-candidate-promotion.md).
 
 ## Image hygiene and first-run identity
 
