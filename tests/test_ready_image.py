@@ -38,6 +38,7 @@ EXAMPLE_MANIFEST = (
 FINAL_MANIFEST = (
     ROOT / "images" / "manifests" / "p9qemu-9front-11554-amd64-hjfs-gmt-002.json"
 )
+USER_GUIDE = ROOT / "images" / "p9qemu-9front-11554-amd64-hjfs-gmt-002" / "README.md"
 
 
 def _write_json(path: Path, document: object) -> None:
@@ -193,6 +194,18 @@ def test_candidate_002_final_manifest_is_valid_and_pinned() -> None:
     assert sha256_file(FINAL_MANIFEST) == (
         "cfee07ec6fcf82d15ce77b43d8633f696e92118f8cff166a766ccdc9c05dfc53"
     )
+
+
+def test_candidate_002_user_guide_pins_the_public_workflow() -> None:
+    guide = USER_GUIDE.read_text(encoding="utf-8")
+    manifest_url = (
+        "https://github.com/dharmatech/p9qemu/releases/download/"
+        "ready-9front-11554-amd64-hjfs-gmt-002/image.json"
+    )
+
+    assert f"p9qemu image create {manifest_url} 9front-11554" in guide
+    assert "p9qemu start --instance 9front-11554" in guide
+    assert "p9qemu start --instance 9front-11554 --accel whpx" in guide
 
 
 def test_manifest_loader_rejects_duplicate_json_fields(tmp_path: Path) -> None:

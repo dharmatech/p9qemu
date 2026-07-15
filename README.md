@@ -7,9 +7,10 @@ launch, so the underlying configuration remains visible and copyable.
 
 The project is in early version 1 development. Installation, startup, and guest
 networking have been tested on Ubuntu under WSL with KVM and on native Windows
-11 with TCG software emulation. The opt-in Windows WHPX profile has also passed
-boot and desktop-responsiveness testing on the development host; its remaining
-installation, networking, and broader compatibility checks are still pending.
+11 with TCG software emulation. The public ready-image workflow has also passed
+download, overlay creation, graphical boot, networking, and clean-shutdown
+tests with Linux KVM, Windows TCG, and the opt-in Windows WHPX profile. Broader
+WHPX host compatibility remains experimental.
 
 ## Prerequisites
 
@@ -97,6 +98,9 @@ An overridden URL without `--iso-sha256` produces a warning.
 
 ## Create an instance from a ready image
 
+A concise, tested quick start is available for the published
+[`9front 11554 AMD64 HJFS GMT stock image`](images/p9qemu-9front-11554-amd64-hjfs-gmt-002/README.md).
+
 A published ready image is selected by its small `image.json` manifest rather
 than by linking directly to its large archive. Given a manifest URL, create a
 new writable instance directory with:
@@ -159,7 +163,7 @@ The default runtime profile uses 2048 MiB of memory, VirtIO networking, VirtIO
 SCSI storage, and the localhost-only port forwards established by the original
 `9front-notes` scripts. On Linux, `--accel auto` uses KVM when `/dev/kvm` is
 accessible and otherwise uses TCG. Windows `auto` currently uses the proven TCG
-profile while WHPX is validated against stock 9front.
+profile; WHPX remains an explicit opt-in because host compatibility varies.
 
 Windows users may explicitly test hardware acceleration with:
 

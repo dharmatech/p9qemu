@@ -490,14 +490,30 @@ the Ubuntu VHDX remained exactly 219465908224 bytes (204.39 GiB) before and
 after the run. No network request, QEMU process, archive extraction, or
 publication occurred.
 
+### User-facing image page decision (2026-07-15)
+
+The primary candidate page deliberately leads with only the P9QEMU workflow:
+install the tool, create a named instance from the exact manifest URL, and
+start that instance. It explains cache-backed overlays after the working
+commands and keeps the optional Windows WHPX form separate from the portable
+default. P9QEMU's printed QEMU command preserves runtime transparency without
+placing manual archive extraction, backing-file construction, and raw-QEMU
+commands in the initial on-ramp.
+
+Direct-QEMU instructions are deferred to a separate advanced page. They should
+not be linked as a supported path until the entire manual download, checksum,
+safe extraction, overlay creation, launch, and shutdown sequence has its own
+Linux and Windows acceptance evidence.
+
 ## Next phases
 
 The next useful increments are intentionally separable:
 
-1. record the user-facing image page with P9QEMU and direct-QEMU commands;
-2. decide whether candidate 002 is promoted beyond prerelease status or
+1. decide whether candidate 002 is promoted beyond prerelease status or
    remains a permanently identified reference candidate; and
-3. clean up the retained disposable acceptance instances after their evidence
+2. design and test the optional advanced direct-QEMU path independently;
+3. define the separately identified Drawterm-enabled ready-image variant; and
+4. clean up the retained disposable acceptance instances after their evidence
    is no longer needed.
 
 Additional selection conveniences remain open. The current command accepts an
