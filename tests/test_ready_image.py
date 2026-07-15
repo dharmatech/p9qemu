@@ -35,6 +35,9 @@ EXAMPLE_MANIFEST = (
     / "manifests"
     / "p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json"
 )
+FINAL_MANIFEST = (
+    ROOT / "images" / "manifests" / "p9qemu-9front-11554-amd64-hjfs-gmt-002.json"
+)
 
 
 def _write_json(path: Path, document: object) -> None:
@@ -172,6 +175,23 @@ def test_candidate_002_example_manifest_is_valid() -> None:
     assert manifest.bundle.file_count == 17
     assert manifest.image.sha256 == (
         "1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8"
+    )
+
+
+def test_candidate_002_final_manifest_is_valid_and_pinned() -> None:
+    manifest = load_ready_image_manifest(FINAL_MANIFEST)
+
+    assert manifest.image_id == "p9qemu-9front-11554-amd64-hjfs-gmt-002"
+    assert manifest.artifact.url == (
+        "https://github.com/dharmatech/p9qemu/releases/download/"
+        "ready-9front-11554-amd64-hjfs-gmt-002/"
+        "p9qemu-9front-11554-amd64-hjfs-gmt-002.tar.gz"
+    )
+    assert manifest.artifact.sha256 == (
+        "ddf9086ab7925e891ea6d577474f70a6eccd91dccc85d5fc29b0d3acf29b6c4d"
+    )
+    assert sha256_file(FINAL_MANIFEST) == (
+        "cfee07ec6fcf82d15ce77b43d8633f696e92118f8cff166a766ccdc9c05dfc53"
     )
 
 

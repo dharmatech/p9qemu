@@ -2,17 +2,18 @@
 
 ## Status
 
-Implemented as an internal foundation. Schema 1 can describe a deterministic
-release-candidate archive, the internal generator can derive that manifest by
-streaming the archive, `p9qemu` can acquire it through bounded resumable HTTPS,
-and the local installer can verify the archive and place its QCOW2 in a
-content-addressed, read-only cache. This phase deliberately does not add a
-public catalog, a public CLI command, instance overlays, or GitHub publication.
+Implemented through the explicit-manifest CLI boundary. Schema 1 describes a
+deterministic release-candidate archive, the internal generator derives that
+manifest by streaming the archive, `p9qemu image create` acquires it through
+bounded resumable HTTPS, and `p9qemu start --instance` launches a fully
+reverified writable overlay backed by the content-addressed, read-only cache.
+This phase deliberately does not add a public catalog, moving aliases, or
+automatic cache relocation.
 
 The checked-in [candidate-002 example](../../images/manifests/p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json)
-uses the exact measurements and digests from the validated local bundle. Its
-`example.invalid` URL is intentionally non-downloadable until a human approves
-and publishes the asset.
+uses the exact measurements and digests from the validated local bundle. The
+[final candidate-002 manifest](../../images/manifests/p9qemu-9front-11554-amd64-hjfs-gmt-002.json)
+differs only by supplying the explicitly approved GitHub prerelease asset URL.
 
 ## Separation of metadata
 
@@ -345,8 +346,29 @@ The first example records:
 - QCOW2 stored bytes: `559022080` and virtual bytes: `32212254720`; and
 - QCOW2 SHA-256: `1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8`.
 
-These values describe the validated local candidate. They do not announce a
-release or authorize an upload.
+These measurements alone did not announce a release or authorize an upload.
+
+### Prerelease publication authorization (2026-07-15)
+
+Publication was explicitly approved for the exact candidate under the unique
+tag `ready-9front-11554-amd64-hjfs-gmt-002`. The tag must point to the commit
+containing the final external manifest and this provenance record. The draft
+release may contain exactly these two assets:
+
+- `image.json`; and
+- `p9qemu-9front-11554-amd64-hjfs-gmt-002.tar.gz`.
+
+The generated 1344-byte final manifest has SHA-256
+`cfee07ec6fcf82d15ce77b43d8633f696e92118f8cff166a766ccdc9c05dfc53`.
+It pins the archive URL under that tag, the archive and internal-manifest
+digests, the complete archive inventory, and the standalone QCOW2 digest.
+Generation streamed and verified the retained archive in 38.6 seconds without
+extracting another image.
+
+The release must remain marked as a prerelease and not as Latest while the
+public-URL download, immutable-cache installation, writable-overlay creation,
+Linux boot, and Windows boot gates are pending. Existing assets and this tag
+must never be replaced; a correction requires candidate `003`.
 
 ### Streaming-generator acceptance (2026-07-15)
 
