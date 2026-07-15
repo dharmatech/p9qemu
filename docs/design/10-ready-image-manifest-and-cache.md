@@ -211,10 +211,57 @@ failed work is removed and cannot become a cache hit. A cache hit is not based
 only on directory presence: the saved external manifest, complete internal
 bundle inventory, image digest, and read-only state are checked again.
 
-The base QCOW2 is marked read-only. Future instance creation must produce a
-writable overlay and must never launch the shared base as a writable instance
-disk. Overlay creation, backing-file relocation policy, and the user-facing
-command remain outside this phase.
+The base QCOW2 is marked read-only. It must never be launched as a writable
+instance disk.
+
+## Writable instance boundary
+
+One internal operation can create a durable instance from a verified cache
+entry. Schema 1 deliberately requires a new destination directory and creates
+this fixed layout:
+
+```text
+<instance>/
+  disk.qcow2
+  instance.json
+```
+
+`disk.qcow2` is a sparse writable QCOW2 overlay. It is created with an explicit
+QCOW2 backing format and the cached base's canonical absolute path. Absolute
+paths are the least ambiguous cross-platform policy for the first schema, but
+they intentionally bind an instance to its current host and cache location.
+Moving or deleting the cache makes the instance unusable until a future,
+explicit rebase workflow is designed. The program must fail visibly and must
+never silently select a different base.
+
+`instance.json` records:
+
+- the instance disk name, format, and inherited virtual size;
+- the absolute cache-entry and backing-image paths;
+- the exact external `image.json` SHA-256;
+- the immutable image ID and uncompressed base SHA-256; and
+- the runtime profile and capability list.
+
+Creation first fully reverifies the cached release bundle and read-only base.
+It builds the overlay in a unique sibling staging directory, runs `qemu-img
+info --output=json`, and requires the expected format, virtual size, absolute
+backing file, backing format when reported, and a clean dirty flag. It hashes
+the base again after overlay creation and rejects any change.
+
+Only a verified staged overlay and strictly round-tripped metadata may be
+published. The destination directory is created exclusively, the overlay is
+hard-linked into it without replacement, and `instance.json` is linked last as
+the completion marker. A handled failure removes staging and any incomplete
+destination owned by that attempt. An existing destination is always refused,
+even when empty.
+
+Before a future launch, the verifier must require `instance.json`, fully
+reverify the referenced cached bundle, rehash its external manifest, compare
+all recorded identity and runtime fields, require a writable overlay, and
+query `qemu-img info` again. This makes cache relocation, metadata edits,
+backing-file substitution, and accidental direct-base use fail closed. This
+checkpoint creates and verifies instances only; it does not launch, rebase,
+clone, snapshot, delete, or garbage-collect them.
 
 ## Candidate 002 measurements
 
@@ -250,9 +297,9 @@ publication occurred.
 
 The next useful increments are intentionally separable:
 
-1. create a writable per-instance overlay over the cached base;
-2. expose acquisition, installation, and instance creation through a final CLI
-   vocabulary;
+1. perform an explicitly approved real `qemu-img` overlay acceptance test;
+2. expose acquisition, installation, instance creation, verification, and
+   launch through a final CLI vocabulary;
 3. perform an explicitly approved live-download acceptance test; and
 4. only then define the reviewed GitHub publication procedure and catalog.
 

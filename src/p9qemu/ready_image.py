@@ -464,6 +464,25 @@ def _verify_cached_entry(entry: Path, manifest: ReadyImageManifest) -> CachedRea
     return CachedReadyImage(manifest, entry, bundle, image)
 
 
+def load_cached_ready_image(entry: Path) -> CachedReadyImage:
+    """Load and fully reverify one content-addressed ready-image cache entry."""
+
+    manifest = load_ready_image_manifest(entry / "image.json")
+    return _verify_cached_entry(entry, manifest)
+
+
+def verify_cached_ready_image(cached: CachedReadyImage) -> CachedReadyImage:
+    """Reverify a cached-image handle and reject mismatched stored paths."""
+
+    verified = _verify_cached_entry(cached.entry, cached.manifest)
+    if (
+        verified.bundle.resolve() != cached.bundle.resolve()
+        or verified.image.resolve() != cached.image.resolve()
+    ):
+        raise P9QemuError("cached ready-image handle does not match its cache entry")
+    return verified
+
+
 def _prepare_cache_parent(cache_dir: Path) -> Path:
     if cache_dir.exists() and not cache_dir.is_dir():
         raise P9QemuError(f"ready-image cache path is not a directory: {cache_dir}")

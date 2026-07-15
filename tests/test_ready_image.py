@@ -15,8 +15,10 @@ from p9qemu.errors import P9QemuError
 from p9qemu.media import sha256_file
 from p9qemu.ready_image import (
     install_local_ready_image,
+    load_cached_ready_image,
     load_ready_image_manifest,
     parse_ready_image_manifest,
+    verify_cached_ready_image,
 )
 from p9qemu.ready_image_manifest import (
     ReadyImageManifestInputs,
@@ -320,6 +322,8 @@ def test_local_archive_is_verified_and_atomically_cached(tmp_path: Path) -> None
         manifest_path, archive, cache, progress=messages.append
     )
     assert again == cached
+    assert load_cached_ready_image(cached.entry) == cached
+    assert verify_cached_ready_image(cached) == cached
     assert messages[-1] == f"Using cached ready image: {cached.entry}"
 
     cached.image.chmod(stat.S_IREAD | stat.S_IWRITE)
