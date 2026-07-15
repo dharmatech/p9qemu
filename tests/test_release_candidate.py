@@ -547,3 +547,34 @@ def test_archive_extraction_rejects_path_traversal(tmp_path: Path) -> None:
         extract_release_archive(archive, destination, "bundle")
     assert not destination.exists()
     assert not (tmp_path / "escape.txt").exists()
+
+
+def test_archive_extraction_rejects_nonportable_backslash_path(tmp_path: Path) -> None:
+    archive = tmp_path / "malicious.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        payload = b"ambiguous"
+        info = tarfile.TarInfo("bundle\\file.txt")
+        info.size = len(payload)
+        tar.addfile(info, BytesIO(payload))
+
+    destination = tmp_path / "extract"
+    with pytest.raises(P9QemuError, match="unsafe path"):
+        extract_release_archive(archive, destination, "bundle")
+    assert not destination.exists()
+
+
+def test_archive_extraction_rejects_links(tmp_path: Path) -> None:
+    archive = tmp_path / "malicious.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        root = tarfile.TarInfo("bundle")
+        root.type = tarfile.DIRTYPE
+        tar.addfile(root)
+        link = tarfile.TarInfo("bundle/link")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "target"
+        tar.addfile(link)
+
+    destination = tmp_path / "extract"
+    with pytest.raises(P9QemuError, match="unsupported entry"):
+        extract_release_archive(archive, destination, "bundle")
+    assert not destination.exists()

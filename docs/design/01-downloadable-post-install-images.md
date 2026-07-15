@@ -2,8 +2,11 @@
 
 ## Status
 
-Future direction for version 2. This note records design intent and does not
-expand the version 1 implementation scope.
+Phased future direction. The first local-only schema and immutable-cache
+foundation is now implemented, without a network, CLI, instance-creation, or
+publication workflow. See
+[`10-ready-image-manifest-and-cache.md`](10-ready-image-manifest-and-cache.md)
+for the exact implemented boundary.
 
 ## Motivation
 
@@ -92,9 +95,10 @@ Each published image should have machine-readable metadata containing at least:
 - the compatible `p9qemu`/QEMU profile version; and
 - a human-readable description of the installed system.
 
-The manifest format and location remain open. It could be a versioned release
-asset, a project-level catalog, or both. `p9qemu` must not infer security-
-critical metadata solely from filenames.
+Schema 1 now defines a small external manifest that pins a deterministic
+tar-gzip release bundle, its internal provenance manifest, and its extracted
+QCOW2. A later catalog location and selection vocabulary remain open. `p9qemu`
+must not infer security-critical metadata solely from filenames.
 
 Downloads, decompression, and cache publication must follow the same safety
 rules as installation media: write temporary files, verify them, and atomically

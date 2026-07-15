@@ -1,0 +1,41 @@
+{
+  "artifact": {
+    "filename": "p9qemu-9front-11554-amd64-hjfs-gmt-002.tar.gz",
+    "packaging": "tar-gzip",
+    "sha256": "ddf9086ab7925e891ea6d577474f70a6eccd91dccc85d5fc29b0d3acf29b6c4d",
+    "size": 250529927,
+    "url": "https://example.invalid/p9qemu-9front-11554-amd64-hjfs-gmt-002.tar.gz"
+  },
+  "bundle": {
+    "extracted_size": 559069219,
+    "file_count": 17,
+    "manifest_path": "manifest.json",
+    "manifest_sha256": "2bee7a835ae594b9d0b80115c1e8575ce0ad152d4d7eb6605b3513ec87d7280e",
+    "member_count": 21,
+    "root": "p9qemu-9front-11554-amd64-hjfs-gmt-002"
+  },
+  "guest": {
+    "architecture": "amd64",
+    "distribution": "9front",
+    "release": "11554"
+  },
+  "id": "p9qemu-9front-11554-amd64-hjfs-gmt-002",
+  "image": {
+    "format": "qcow2",
+    "path": "p9qemu-9front-11554-amd64-hjfs-gmt-002.qcow2",
+    "sha256": "1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8",
+    "stored_size": 559022080,
+    "virtual_size": 32212254720
+  },
+  "kind": "p9qemu-ready-image",
+  "runtime": {
+    "capabilities": [
+      "graphical-console",
+      "serial-console"
+    ],
+    "profile": "9front-11554-amd64-graphical-serial-v1"
+  },
+  "schema": 1,
+  "title": "9front 11554 amd64 HJFS GMT stock image (candidate 002)",
+  "variant": "stock"
+}

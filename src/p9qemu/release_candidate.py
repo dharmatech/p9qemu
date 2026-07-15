@@ -20,6 +20,7 @@ from p9qemu.constants import DEFAULT_MAC_ADDRESS
 from p9qemu.errors import P9QemuError
 from p9qemu.host import Acceleration
 from p9qemu.media import sha256_file
+from p9qemu.portable_path import portable_relative_path
 from p9qemu.provenance import (
     artifact_record,
     utc_timestamp,
@@ -71,6 +72,7 @@ _REQUIRED_VALIDATION_CHECKS = {
     "network-ping",
     "orderly-shutdown",
 }
+_MAX_ARCHIVE_MEMBERS = 4096
 
 
 @dataclass(frozen=True)
@@ -579,9 +581,9 @@ def scan_public_text(paths: Sequence[Path], *, root: Path) -> tuple[str, ...]:
 
 def _safe_relative_artifact(root: Path, record: Mapping[str, Any], label: str) -> Path:
     relative_text = _string(record.get("path"), f"artifacts.{label}.path")
-    relative = PurePosixPath(relative_text)
-    if relative.is_absolute() or ".." in relative.parts:
-        raise P9QemuError(f"validation artifact path is unsafe: {relative_text}")
+    relative = portable_relative_path(
+        relative_text, f"validation artifact path at artifacts.{label}.path"
+    )
     source = root.joinpath(*relative.parts).resolve()
     try:
         source.relative_to(root.resolve())
@@ -868,9 +870,17 @@ def create_deterministic_tar_gz(bundle: Path, archive: Path) -> None:
 
 
 def _safe_archive_member(member: tarfile.TarInfo, bundle_name: str) -> PurePosixPath:
-    path = PurePosixPath(member.name)
-    if path.is_absolute() or ".." in path.parts or not path.parts:
-        raise P9QemuError(f"release archive contains an unsafe path: {member.name}")
+    member_name = (
+        member.name[:-1]
+        if member.isdir() and member.name.endswith("/")
+        else member.name
+    )
+    try:
+        path = portable_relative_path(member_name, "release archive path")
+    except P9QemuError as error:
+        raise P9QemuError(
+            f"release archive contains an unsafe path: {member.name}"
+        ) from error
     if path.parts[0] != bundle_name:
         raise P9QemuError(f"release archive contains an unexpected root: {member.name}")
     if member.issym() or member.islnk() or not (member.isfile() or member.isdir()):
@@ -880,7 +890,15 @@ def _safe_archive_member(member: tarfile.TarInfo, bundle_name: str) -> PurePosix
     return path
 
 
-def extract_release_archive(archive: Path, destination: Path, bundle_name: str) -> Path:
+def extract_release_archive(
+    archive: Path,
+    destination: Path,
+    bundle_name: str,
+    *,
+    expected_member_count: int | None = None,
+    expected_file_count: int | None = None,
+    expected_extracted_size: int | None = None,
+) -> Path:
     """Safely extract a candidate archive without links or path traversal."""
 
     if destination.exists():
@@ -890,8 +908,26 @@ def extract_release_archive(archive: Path, destination: Path, bundle_name: str) 
     destination.mkdir()
     try:
         with tarfile.open(archive, mode="r:gz") as tar:
-            seen: set[str] = set()
+            members: list[tarfile.TarInfo] = []
             for member in tar:
+                members.append(member)
+                if len(members) > _MAX_ARCHIVE_MEMBERS:
+                    raise P9QemuError(
+                        "release archive exceeds the supported member-count limit"
+                    )
+            if (
+                expected_member_count is not None
+                and len(members) != expected_member_count
+            ):
+                raise P9QemuError(
+                    "release archive member count does not match image.json"
+                )
+            seen: set[str] = set()
+            directories: set[str] = set()
+            validated: list[tuple[tarfile.TarInfo, PurePosixPath]] = []
+            file_count = 0
+            extracted_size = 0
+            for member in members:
                 relative = _safe_archive_member(member, bundle_name)
                 normalized = relative.as_posix()
                 if normalized in seen:
@@ -899,27 +935,72 @@ def extract_release_archive(archive: Path, destination: Path, bundle_name: str) 
                         f"release archive contains a duplicate entry: {normalized}"
                     )
                 seen.add(normalized)
+                if normalized == bundle_name and not member.isdir():
+                    raise P9QemuError("release archive bundle root is not a directory")
+                if relative.parent != PurePosixPath(".") and (
+                    relative.parent.as_posix() not in directories
+                ):
+                    raise P9QemuError(
+                        "archive entry appears before its parent directory: "
+                        f"{normalized}"
+                    )
+                if member.isdir():
+                    directories.add(normalized)
+                else:
+                    if member.size < 0:
+                        raise P9QemuError(
+                            f"release archive contains a negative file size: {normalized}"
+                        )
+                    file_count += 1
+                    extracted_size += member.size
+                validated.append((member, relative))
+
+            if expected_file_count is not None and file_count != expected_file_count:
+                raise P9QemuError(
+                    "release archive file count does not match image.json"
+                )
+            if (
+                expected_extracted_size is not None
+                and extracted_size != expected_extracted_size
+            ):
+                raise P9QemuError(
+                    "release archive extracted size does not match image.json"
+                )
+
+            for member, relative in validated:
+                normalized = relative.as_posix()
                 target = destination.joinpath(*relative.parts)
                 if member.isdir():
-                    target.mkdir(parents=True, exist_ok=False)
+                    target.mkdir(exist_ok=False)
                     continue
-                if not target.parent.is_dir():
-                    raise P9QemuError(
-                        f"archive file appears before its parent directory: {normalized}"
-                    )
                 source = tar.extractfile(member)
                 if source is None:
                     raise P9QemuError(f"could not read archive member: {normalized}")
                 with source, target.open("xb") as output:
                     shutil.copyfileobj(source, output, length=1024 * 1024)
-    except (OSError, tarfile.TarError, P9QemuError):
+    except P9QemuError:
         shutil.rmtree(destination, ignore_errors=True)
         raise
+    except (OSError, tarfile.TarError) as error:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise P9QemuError(
+            f"could not extract release archive {archive}: {error}"
+        ) from error
     return destination / bundle_name
 
 
 def verify_extracted_bundle(bundle: Path) -> dict[str, object]:
     """Verify every manifest-bound artifact in an extracted bundle."""
+
+    if bundle.is_symlink() or not bundle.is_dir():
+        raise P9QemuError(f"extracted release bundle is not a directory: {bundle}")
+    for root, directories, files in os.walk(bundle, followlinks=False):
+        for name in [*directories, *files]:
+            path = Path(root) / name
+            if path.is_symlink():
+                raise P9QemuError(
+                    f"extracted release bundle contains a symbolic link: {path}"
+                )
 
     manifest_path = bundle / "manifest.json"
     manifest = load_json_object(manifest_path, "release manifest")
@@ -932,9 +1013,9 @@ def verify_extracted_bundle(bundle: Path) -> dict[str, object]:
     for label, value in artifacts.items():
         record = _mapping(value, f"artifacts.{label}")
         relative_text = _string(record.get("path"), f"artifacts.{label}.path")
-        relative = PurePosixPath(relative_text)
-        if relative.is_absolute() or ".." in relative.parts:
-            raise P9QemuError(f"release artifact path is unsafe: {relative_text}")
+        relative = portable_relative_path(
+            relative_text, f"release artifact path at artifacts.{label}.path"
+        )
         path = bundle.joinpath(*relative.parts)
         if not path.is_file():
             raise P9QemuError(f"release artifact is missing after extraction: {path}")
@@ -957,9 +1038,9 @@ def verify_extracted_bundle(bundle: Path) -> dict[str, object]:
             f"release bundle file inventory mismatch; extras={extras}, missing={missing}"
         )
     image = _mapping(manifest.get("image"), "release image")
-    image_relative = PurePosixPath(_string(image.get("path"), "image.path"))
-    if image_relative.is_absolute() or ".." in image_relative.parts:
-        raise P9QemuError(f"release image path is unsafe: {image_relative}")
+    image_relative = portable_relative_path(
+        _string(image.get("path"), "image.path"), "release image path"
+    )
     image_path = bundle.joinpath(*image_relative.parts)
     image_sha256 = sha256_file(image_path)
     if image_sha256 != image.get("sha256"):
