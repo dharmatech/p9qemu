@@ -449,12 +449,22 @@ def _require_target(
         )
 
 
-def _append_command(profile: DrawtermPostinstallProfile) -> str:
-    commands = [f"cp {profile.plan9_ini.path} {STAGED_PLAN9_INI}"]
+def _stage_commands(profile: DrawtermPostinstallProfile) -> tuple[tuple[str, str], ...]:
+    commands = [
+        (
+            "guest.stage-plan9-ini-copy",
+            f"cp {profile.plan9_ini.path} {STAGED_PLAN9_INI}",
+        )
+    ]
     commands.extend(
-        f"echo '{value}' >>{STAGED_PLAN9_INI}" for value in profile.plan9_ini.additions
+        (
+            f"guest.stage-plan9-ini-{name}",
+            f"echo '{name}={value}' >>{STAGED_PLAN9_INI}",
+        )
+        for name, value in profile.plan9_ini.target_required
+        if name in profile.plan9_ini.source_absent
     )
-    return "; ".join(commands)
+    return tuple(commands)
 
 
 def _expected_after(before: str, profile: DrawtermPostinstallProfile) -> str:
@@ -518,8 +528,8 @@ def drive_drawterm_preparation(
     if "P9QEMU_NVRAM_READY" not in _command_output_lines(probe_output, nvram_probe):
         raise P9QemuError("the pinned NVRAM partition is not available")
 
-    append_command = _append_command(profile)
-    transport.command("guest.stage-plan9-ini", append_command, SHELL_PROMPT, 60)
+    for state, command in _stage_commands(profile):
+        transport.command(state, command, SHELL_PROMPT, 60)
     staged_command = f"cat {STAGED_PLAN9_INI}"
     staged = _command_output_text(
         transport.command(

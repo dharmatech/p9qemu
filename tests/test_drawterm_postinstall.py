@@ -139,10 +139,13 @@ def test_driver_applies_exact_additions_and_configures_nvram() -> None:
         "fshalt",
     ]
     stage_commands = [
-        value for state, value in transport.commands if state == "guest.stage-plan9-ini"
+        value
+        for state, value in transport.commands
+        if state.startswith("guest.stage-plan9-ini-")
     ]
-    assert len(stage_commands) == 1
+    assert len(stage_commands) == 4
     assert stage_commands[0].startswith(f"cp /n/9fat/plan9.ini {STAGED_PLAN9_INI}")
+    assert max(map(len, stage_commands)) < 128
     assert transport.waited[-1] == "shutdown.fshalt"
 
 
@@ -178,7 +181,9 @@ def test_driver_rejects_unexpected_source_before_writing(mutator, match: str) ->
     transport.before = mutator(transport.before)
     with pytest.raises(P9QemuError, match=match):
         drive_drawterm_preparation(transport, profile)
-    assert not any(state == "guest.stage-plan9-ini" for state, _ in transport.commands)
+    assert not any(
+        state.startswith("guest.stage-plan9-ini-") for state, _ in transport.commands
+    )
     assert "auth/wrkey" not in transport.lines
 
 
@@ -188,7 +193,9 @@ def test_driver_requires_the_pinned_nvram_partition() -> None:
     transport.nvram_available = False
     with pytest.raises(P9QemuError, match="NVRAM partition is not available"):
         drive_drawterm_preparation(transport, profile)
-    assert not any(state == "guest.stage-plan9-ini" for state, _ in transport.commands)
+    assert not any(
+        state.startswith("guest.stage-plan9-ini-") for state, _ in transport.commands
+    )
 
 
 def test_driver_requires_source_file_to_end_with_newline() -> None:
@@ -197,7 +204,9 @@ def test_driver_requires_source_file_to_end_with_newline() -> None:
     transport.before = transport.before.rstrip("\n")
     with pytest.raises(P9QemuError, match="must end with a newline"):
         drive_drawterm_preparation(transport, profile)
-    assert not any(state == "guest.stage-plan9-ini" for state, _ in transport.commands)
+    assert not any(
+        state.startswith("guest.stage-plan9-ini-") for state, _ in transport.commands
+    )
 
 
 def test_driver_rejects_changes_outside_qualified_additions() -> None:
