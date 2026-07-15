@@ -28,6 +28,7 @@ from p9qemu.provenance import (
     write_text_new,
 )
 from p9qemu.qemu import build_automated_validation_command, render_command
+from p9qemu.runtime import RuntimeBootProfile, load_runtime_profile
 from p9qemu.validation import (
     GuestValidationError,
     GuestValidationResult,
@@ -54,6 +55,7 @@ class EventRecorder:
 class BundlePaths:
     root: Path
     answers: Path
+    runtime_profile: Path
     overlay: Path
     console_log: Path
     command: Path
@@ -79,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("--answers", type=Path, required=True)
+    parser.add_argument(
+        "--runtime-profile",
+        type=Path,
+        help="qualified post-install runtime profile expected in the image",
+    )
     parser.add_argument("--disk", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
@@ -124,6 +131,7 @@ def _bundle_paths(root: Path) -> BundlePaths:
     return BundlePaths(
         root=root,
         answers=root / "answers.toml",
+        runtime_profile=root / "runtime.toml",
         overlay=root / "validation-overlay.qcow2",
         console_log=root / "boot.raw.log",
         command=root / "qemu-command.txt",
@@ -155,6 +163,8 @@ def _existing_artifacts(paths: BundlePaths) -> dict[str, dict[str, object]]:
         "qemu_img_check_before": paths.check_before,
         "qemu_img_check_after": paths.check_after,
     }
+    if paths.runtime_profile.is_file():
+        candidates["runtime_profile"] = paths.runtime_profile
     if paths.overlay.is_file():
         candidates["retained_overlay"] = paths.overlay
     return {
@@ -186,6 +196,8 @@ def _run_validation(
     *,
     answers: InstallAnswers,
     answers_path: Path,
+    runtime_profile: RuntimeBootProfile | None,
+    runtime_profile_path: Path | None,
     disk: Path,
     paths: BundlePaths,
     memory_mib: int,
@@ -208,6 +220,8 @@ def _run_validation(
     try:
         paths.root.mkdir()
         _copy_new(answers_path, paths.answers)
+        if runtime_profile_path is not None:
+            _copy_new(runtime_profile_path, paths.runtime_profile)
         write_text_new(paths.command, rendered + "\n")
         write_json_new(paths.info, image_info)
         write_text_new(paths.check_before, check_before)
@@ -231,7 +245,7 @@ def _run_validation(
         )
         validation = run_pexpect_validation(
             command,
-            build_guest_validation_profile(answers),
+            build_guest_validation_profile(answers, runtime_profile),
             network_mode=network_mode,
             progress=recorder,
         )
@@ -280,6 +294,10 @@ def _run_validation(
         source_commit=source_commit,
         answers=answers,
         answers_sha256=sha256_file(paths.answers),
+        runtime_profile=runtime_profile,
+        runtime_profile_sha256=(
+            sha256_file(paths.runtime_profile) if runtime_profile is not None else None
+        ),
         base_image=disk,
         base_sha256_before=base_sha256_before,
         base_sha256_after=base_sha256_after,
@@ -323,13 +341,25 @@ def run(argv: list[str] | None = None) -> int:
                 "the experimental Pexpect validator is supported only on Linux"
             )
         answers_path = _absolute(args.answers)
+        runtime_profile_path = (
+            _absolute(args.runtime_profile)
+            if args.runtime_profile is not None
+            else None
+        )
         disk = _absolute(args.disk)
         output_dir = _absolute(args.output_dir)
         _require_existing_file(answers_path, "answer file")
+        if runtime_profile_path is not None:
+            _require_existing_file(runtime_profile_path, "runtime profile")
         _require_existing_file(disk, "base disk image")
         _require_new_directory(output_dir)
         source_commit = validate_source_commit(args.source_commit)
         answers = load_answers(answers_path)
+        runtime_profile = (
+            load_runtime_profile(runtime_profile_path)
+            if runtime_profile_path is not None
+            else None
+        )
         executables = discover_qemu(host)
         acceleration = resolve_acceleration(args.accel, host)
         paths = _bundle_paths(output_dir)
@@ -344,6 +374,11 @@ def run(argv: list[str] | None = None) -> int:
 
         print("Experimental mode: disposable-overlay validation")
         print(f"Answer file: {answers_path}")
+        print(
+            f"Runtime profile: {runtime_profile_path}"
+            if runtime_profile_path is not None
+            else "Runtime profile: installation defaults"
+        )
         print(f"Immutable base image: {disk}")
         print(f"New evidence directory: {output_dir}")
         print(f"Network check: {args.network_check}")
@@ -356,6 +391,8 @@ def run(argv: list[str] | None = None) -> int:
         return _run_validation(
             answers=answers,
             answers_path=answers_path,
+            runtime_profile=runtime_profile,
+            runtime_profile_path=runtime_profile_path,
             disk=disk,
             paths=paths,
             memory_mib=args.memory,

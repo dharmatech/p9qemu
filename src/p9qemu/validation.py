@@ -9,6 +9,7 @@ from typing import Literal, Protocol
 
 from p9qemu.answers import InstallAnswers
 from p9qemu.errors import P9QemuError
+from p9qemu.runtime import RuntimeBootProfile
 
 
 CheckCategory = Literal["deterministic", "environmental"]
@@ -91,10 +92,27 @@ class GuestValidationTransport(Protocol):
 
 def build_guest_validation_profile(
     answers: InstallAnswers,
+    runtime_profile: RuntimeBootProfile | None = None,
 ) -> GuestValidationProfile:
     """Resolve expected guest state from qualified installation answers."""
 
     home = f"/usr/{answers.user}"
+    if (
+        runtime_profile is not None
+        and runtime_profile.installer_profile != answers.installer_profile
+    ):
+        raise P9QemuError(
+            "runtime profile installer binding does not match the answer file"
+        )
+    plan9_ini_values = [
+        f"bootargs=local!{answers.hjfs_partition} -m {answers.hjfs_cache_mib}"
+    ]
+    if runtime_profile is None:
+        plan9_ini_values.extend(
+            (f"vgasize={answers.vgasize}", f"console={answers.console}")
+        )
+    else:
+        plan9_ini_values.extend(runtime_profile.target_values)
     return GuestValidationProfile(
         profile_id=answers.installer_profile,
         user=answers.user,
@@ -102,11 +120,7 @@ def build_guest_validation_profile(
         system_name=answers.system_name,
         timezone=answers.timezone,
         root_partition=answers.hjfs_partition,
-        plan9_ini_values=(
-            f"bootargs=local!{answers.hjfs_partition} -m {answers.hjfs_cache_mib}",
-            f"vgasize={answers.vgasize}",
-            f"console={answers.console}",
-        ),
+        plan9_ini_values=tuple(plan9_ini_values),
         stock_home_files=(
             f"{home}/bin/rc/riostart",
             f"{home}/lib/L.webcookies",

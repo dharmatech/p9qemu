@@ -28,6 +28,7 @@ from p9qemu.provenance import (
     write_text_new,
 )
 from p9qemu.qemu import DEFAULT_PORT_FORWARDS, build_start_command, render_command
+from p9qemu.runtime import RuntimeBootProfile
 
 
 _IDENTIFIER = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -50,6 +51,13 @@ _PUBLIC_VALIDATION_ARTIFACTS = {
     "console_log": "validation/boot.raw.log",
     "qemu_img_check_before": "validation/qemu-img-check-before.txt",
     "qemu_img_check_after": "validation/qemu-img-check-after.txt",
+}
+_PUBLIC_PREPARATION_ARTIFACTS = {
+    "console_log": "preparation/preparation.raw.log",
+    "plan9_ini_before": "preparation/plan9.ini.before.txt",
+    "plan9_ini_after": "preparation/plan9.ini.after.txt",
+    "qemu_img_check_input": "preparation/qemu-img-check-input.txt",
+    "qemu_img_check_output": "preparation/qemu-img-check-output.txt",
 }
 _REQUIRED_VALIDATION_CHECKS = {
     "serial-boot",
@@ -81,8 +89,10 @@ class CandidateInputs:
     source_commit: str
     disk: Path
     answers_path: Path
+    runtime_profile_path: Path
     install_log: Path
     install_manifest: Path
+    preparation_manifest: Path
     validation_manifest: Path
     output_dir: Path
     image_hygiene_reviewed: bool
@@ -146,6 +156,8 @@ def _require_validation_checkpoints(
     source_commit: str,
     image_sha256: str,
     answers_sha256: str,
+    runtime_profile: RuntimeBootProfile,
+    runtime_profile_sha256: str,
 ) -> None:
     if document.get("schema") != 1 or document.get("kind") != "p9qemu-image-validation":
         raise P9QemuError("unsupported validation manifest schema or kind")
@@ -168,6 +180,16 @@ def _require_validation_checkpoints(
     if recorded_answers.lower() != answers_sha256.lower():
         raise P9QemuError(
             "validated answer digest does not match the supplied answer file"
+        )
+    manifest_runtime = _mapping(document.get("runtime_profile"), "runtime_profile")
+    recorded_runtime = _string(manifest_runtime.get("sha256"), "runtime_profile.sha256")
+    if recorded_runtime.lower() != runtime_profile_sha256.lower():
+        raise P9QemuError(
+            "validated runtime profile digest does not match the supplied profile"
+        )
+    if manifest_runtime.get("resolved") != asdict(runtime_profile):
+        raise P9QemuError(
+            "validation resolved runtime profile does not match the supplied profile"
         )
 
     overlay = _mapping(document.get("overlay"), "overlay")
@@ -247,6 +269,69 @@ def _require_installation_checkpoints(
         )
 
 
+def _require_preparation_checkpoints(
+    document: Mapping[str, Any],
+    *,
+    source_commit: str,
+    answers: InstallAnswers,
+    runtime_profile: RuntimeBootProfile,
+    image_sha256: str,
+    answers_sha256: str,
+    runtime_profile_sha256: str,
+) -> str:
+    if document.get("schema") != 1 or document.get("kind") != (
+        "p9qemu-image-release-preparation"
+    ):
+        raise P9QemuError("unsupported release-preparation manifest schema or kind")
+    if document.get("status") != "passed":
+        raise P9QemuError("release candidates require preparation status 'passed'")
+    p9qemu = _mapping(document.get("p9qemu"), "preparation.p9qemu")
+    if p9qemu.get("commit") != source_commit:
+        raise P9QemuError("preparation source commit does not match the candidate")
+    manifest_answers = _mapping(document.get("answers"), "preparation.answers")
+    if manifest_answers.get("sha256") != answers_sha256:
+        raise P9QemuError("preparation answer digest does not match the supplied file")
+    if manifest_answers.get("resolved") != asdict(answers):
+        raise P9QemuError("preparation resolved answers do not match the supplied file")
+    manifest_runtime = _mapping(
+        document.get("runtime_profile"), "preparation.runtime_profile"
+    )
+    if manifest_runtime.get("sha256") != runtime_profile_sha256:
+        raise P9QemuError(
+            "preparation runtime profile digest does not match the supplied file"
+        )
+    if manifest_runtime.get("resolved") != asdict(runtime_profile):
+        raise P9QemuError(
+            "preparation resolved runtime profile does not match the supplied file"
+        )
+
+    image = _mapping(document.get("image"), "preparation.image")
+    input_image = _mapping(image.get("input"), "preparation.image.input")
+    output_image = _mapping(image.get("output"), "preparation.image.output")
+    input_sha256 = _string(input_image.get("sha256"), "preparation.image.input.sha256")
+    if input_image.get("unchanged") is not True or (
+        input_image.get("sha256_after") != input_sha256
+    ):
+        raise P9QemuError("preparation did not preserve its installed input image")
+    if image.get("changed") is not True or input_sha256 == image_sha256:
+        raise P9QemuError("preparation did not produce a distinct runtime image")
+    if output_image.get("sha256") != image_sha256:
+        raise P9QemuError("prepared image digest does not match the supplied disk")
+    for label, record in (("input", input_image), ("output", output_image)):
+        if not _string(
+            record.get("qemu_img_check"),
+            f"preparation.image.{label}.qemu_img_check",
+        ).strip():
+            raise P9QemuError(f"preparation {label} image has no qemu-img check")
+        info = _mapping(
+            record.get("qemu_img_info"),
+            f"preparation.image.{label}.qemu_img_info",
+        )
+        if info.get("format") != "qcow2" or info.get("dirty-flag") is not False:
+            raise P9QemuError(f"preparation {label} image is not a clean QCOW2 image")
+    return input_sha256
+
+
 def _sanitized_image_info(value: object) -> dict[str, object]:
     info = _mapping(value, "image.qemu_img_info")
     result = {
@@ -296,6 +381,7 @@ def sanitize_validation_manifest(
     qemu = _mapping(document.get("qemu"), "qemu")
     overlay = _mapping(document.get("overlay"), "overlay")
     answers = _mapping(document.get("answers"), "answers")
+    runtime = _mapping(document.get("runtime_profile"), "runtime_profile")
     validation = _mapping(document.get("validation"), "validation")
     p9qemu = _mapping(document.get("p9qemu"), "p9qemu")
     return {
@@ -312,6 +398,10 @@ def sanitize_validation_manifest(
         "answers": {
             "sha256": answers.get("sha256"),
             "resolved": answers.get("resolved"),
+        },
+        "runtime_profile": {
+            "sha256": runtime.get("sha256"),
+            "resolved": runtime.get("resolved"),
         },
         "host": {
             name: host.get(name)
@@ -396,6 +486,74 @@ def sanitize_install_manifest(
     }
 
 
+def sanitize_preparation_manifest(
+    document: Mapping[str, Any],
+    *,
+    source_sha256: str,
+) -> dict[str, object]:
+    """Create the allow-listed, path-free public preparation record."""
+
+    p9qemu = _mapping(document.get("p9qemu"), "preparation.p9qemu")
+    answers = _mapping(document.get("answers"), "preparation.answers")
+    runtime = _mapping(document.get("runtime_profile"), "preparation.runtime_profile")
+    image = _mapping(document.get("image"), "preparation.image")
+    input_image = _mapping(image.get("input"), "preparation.image.input")
+    output_image = _mapping(image.get("output"), "preparation.image.output")
+    host = _mapping(document.get("host"), "preparation.host")
+    qemu = _mapping(document.get("qemu"), "preparation.qemu")
+    return {
+        "schema": 1,
+        "kind": "p9qemu-public-image-release-preparation",
+        "source_manifest_sha256": source_sha256,
+        "status": document.get("status"),
+        "started_at": document.get("started_at"),
+        "completed_at": document.get("completed_at"),
+        "p9qemu": {
+            "version": p9qemu.get("version"),
+            "commit": p9qemu.get("commit"),
+        },
+        "answers": {
+            "sha256": answers.get("sha256"),
+            "resolved": answers.get("resolved"),
+        },
+        "runtime_profile": {
+            "sha256": runtime.get("sha256"),
+            "resolved": runtime.get("resolved"),
+        },
+        "image": {
+            "input": {
+                "sha256": input_image.get("sha256"),
+                "unchanged": input_image.get("unchanged"),
+                "qemu_img_info": _sanitized_image_info(
+                    input_image.get("qemu_img_info")
+                ),
+                "qemu_img_check": "passed",
+            },
+            "output": {
+                "sha256": output_image.get("sha256"),
+                "qemu_img_info": _sanitized_image_info(
+                    output_image.get("qemu_img_info")
+                ),
+                "qemu_img_check": "passed",
+            },
+            "changed": image.get("changed"),
+        },
+        "host": {
+            name: host.get(name)
+            for name in ("system", "distribution_id", "version_id", "architecture")
+        },
+        "qemu": {
+            name: qemu.get(name)
+            for name in (
+                "system_version",
+                "img_version",
+                "acceleration",
+                "memory_mib",
+            )
+        },
+    }
+
+
 def scan_public_text(paths: Sequence[Path], *, root: Path) -> tuple[str, ...]:
     """Reject common host paths, tokens, and inline secret assignments."""
 
@@ -457,6 +615,21 @@ def public_validation_artifacts(
     return sources
 
 
+def public_preparation_artifacts(
+    document: Mapping[str, Any], manifest_path: Path
+) -> dict[str, Path]:
+    """Resolve and verify the public-safe preparation evidence."""
+
+    records = _mapping(document.get("artifacts"), "preparation.artifacts")
+    sources: dict[str, Path] = {}
+    for label, destination in _PUBLIC_PREPARATION_ARTIFACTS.items():
+        record = _mapping(records.get(label), f"preparation.artifacts.{label}")
+        sources[destination] = _safe_relative_artifact(
+            manifest_path.parent, record, label
+        )
+    return sources
+
+
 def copy_file_new(source: Path, destination: Path) -> None:
     """Copy one file without replacing an existing destination."""
 
@@ -469,7 +642,7 @@ def copy_file_new(source: Path, destination: Path) -> None:
         ) from error
 
 
-def _runtime_profile() -> dict[str, object]:
+def _qemu_runtime_profile() -> dict[str, object]:
     return {
         "schema": 1,
         "memory_mib": 2048,
@@ -568,11 +741,16 @@ def _release_manifest(
     *,
     inputs: CandidateInputs,
     answers: InstallAnswers,
+    runtime_profile: RuntimeBootProfile,
+    runtime_profile_sha256: str,
     image_path: Path,
     image_sha256: str,
     public_installation_path: Path,
     public_installation: Mapping[str, Any],
     private_installation_sha256: str,
+    public_preparation_path: Path,
+    public_preparation: Mapping[str, Any],
+    private_preparation_sha256: str,
     public_validation_path: Path,
     public_validation: Mapping[str, Any],
     private_validation_sha256: str,
@@ -601,6 +779,8 @@ def _release_manifest(
             "installer_profile": answers.installer_profile,
             "installation_media_sha256": answers.iso_sha256,
             "answer_schema": answers.schema,
+            "runtime_profile": runtime_profile.profile_id,
+            "runtime_profile_sha256": runtime_profile_sha256,
         },
         "image": {
             "path": image_path.name,
@@ -614,12 +794,20 @@ def _release_manifest(
             "status": public_installation.get("status"),
             "private_source_manifest_sha256": private_installation_sha256,
         },
+        "preparation": {
+            "path": public_preparation_path.relative_to(image_path.parent).as_posix(),
+            "status": public_preparation.get("status"),
+            "private_source_manifest_sha256": private_preparation_sha256,
+        },
         "validation": {
             "path": public_validation_path.relative_to(image_path.parent).as_posix(),
             "status": public_validation.get("status"),
             "private_source_manifest_sha256": private_validation_sha256,
         },
-        "runtime_profile": _runtime_profile(),
+        "runtime_profile": {
+            "boot": asdict(runtime_profile),
+            "qemu": _qemu_runtime_profile(),
+        },
         "hygiene": {
             "image_contents_review_confirmed": inputs.image_hygiene_reviewed,
             "public_text_scan": "passed",
@@ -803,10 +991,14 @@ def inspect_candidate_inputs(
     inputs: CandidateInputs,
 ) -> tuple[
     InstallAnswers,
+    RuntimeBootProfile,
+    dict[str, Any],
     dict[str, Any],
     dict[str, Any],
     str,
     str,
+    str,
+    dict[str, Path],
     dict[str, Path],
 ]:
     """Validate all candidate inputs without creating any output."""
@@ -818,25 +1010,44 @@ def inspect_candidate_inputs(
     for path, label in (
         (inputs.disk, "disk image"),
         (inputs.answers_path, "answer file"),
+        (inputs.runtime_profile_path, "runtime profile"),
         (inputs.install_log, "install log"),
         (inputs.install_manifest, "installation manifest"),
+        (inputs.preparation_manifest, "release-preparation manifest"),
         (inputs.validation_manifest, "validation manifest"),
     ):
         _require_input_file(path, label)
     _require_new_output(inputs.output_dir)
 
     from p9qemu.answers import load_answers
+    from p9qemu.runtime import load_runtime_profile
 
     answers = load_answers(inputs.answers_path)
+    runtime_profile = load_runtime_profile(inputs.runtime_profile_path)
+    if runtime_profile.installer_profile != answers.installer_profile:
+        raise P9QemuError("runtime profile does not match the installation answers")
     image_sha256 = sha256_file(inputs.disk)
     answers_sha256 = sha256_file(inputs.answers_path)
+    runtime_profile_sha256 = sha256_file(inputs.runtime_profile_path)
     install_log_sha256 = sha256_file(inputs.install_log)
+    preparation = load_json_object(
+        inputs.preparation_manifest, "release-preparation manifest"
+    )
+    installed_image_sha256 = _require_preparation_checkpoints(
+        preparation,
+        source_commit=inputs.source_commit,
+        answers=answers,
+        runtime_profile=runtime_profile,
+        image_sha256=image_sha256,
+        answers_sha256=answers_sha256,
+        runtime_profile_sha256=runtime_profile_sha256,
+    )
     installation = load_json_object(inputs.install_manifest, "installation manifest")
     _require_installation_checkpoints(
         installation,
         source_commit=inputs.source_commit,
         answers=answers,
-        image_sha256=image_sha256,
+        image_sha256=installed_image_sha256,
         answers_sha256=answers_sha256,
         install_log_sha256=install_log_sha256,
     )
@@ -846,33 +1057,57 @@ def inspect_candidate_inputs(
         source_commit=inputs.source_commit,
         image_sha256=image_sha256,
         answers_sha256=answers_sha256,
+        runtime_profile=runtime_profile,
+        runtime_profile_sha256=runtime_profile_sha256,
     )
     manifest_answers = _mapping(validation.get("answers"), "answers")
     if manifest_answers.get("resolved") != asdict(answers):
         raise P9QemuError(
             "validation manifest resolved answers do not match the supplied answer file"
         )
-    public_artifacts = public_validation_artifacts(
+    preparation_artifacts = public_preparation_artifacts(
+        preparation, inputs.preparation_manifest
+    )
+    validation_artifacts = public_validation_artifacts(
         validation, inputs.validation_manifest
     )
-    for path in (inputs.answers_path, inputs.install_log, *public_artifacts.values()):
+    for path in (
+        inputs.answers_path,
+        inputs.runtime_profile_path,
+        inputs.install_log,
+        *preparation_artifacts.values(),
+        *validation_artifacts.values(),
+    ):
         scan_public_text([path], root=path.parent)
     return (
         answers,
+        runtime_profile,
         installation,
+        preparation,
         validation,
         image_sha256,
         answers_sha256,
-        public_artifacts,
+        runtime_profile_sha256,
+        preparation_artifacts,
+        validation_artifacts,
     )
 
 
 def build_release_candidate(inputs: CandidateInputs) -> CandidateResult:
     """Build and round-trip verify one local release candidate atomically."""
 
-    answers, installation, validation, image_sha256, _, validation_artifacts = (
-        inspect_candidate_inputs(inputs)
-    )
+    (
+        answers,
+        runtime_profile,
+        installation,
+        preparation,
+        validation,
+        image_sha256,
+        _,
+        runtime_profile_sha256,
+        preparation_artifacts,
+        validation_artifacts,
+    ) = inspect_candidate_inputs(inputs)
     temporary = inputs.output_dir.with_name(
         f".{inputs.output_dir.name}.p9qemu-{uuid4().hex}.part"
     )
@@ -883,19 +1118,25 @@ def build_release_candidate(inputs: CandidateInputs) -> CandidateResult:
         bundle = temporary / inputs.identity.bundle_name
         bundle.mkdir()
         (bundle / "installation").mkdir()
+        (bundle / "preparation").mkdir()
         (bundle / "validation").mkdir()
         image_path = bundle / f"{inputs.identity.bundle_name}.qcow2"
         answers_path = bundle / "answers.toml"
+        runtime_path = bundle / "runtime.toml"
         install_log = bundle / "install.raw.log"
         running_path = bundle / "RUNNING.md"
         public_installation_path = bundle / "installation" / "manifest.json"
+        public_preparation_path = bundle / "preparation" / "manifest.json"
         public_validation_path = bundle / "validation" / "manifest.json"
 
         copy_file_new(inputs.disk, image_path)
         if sha256_file(image_path) != image_sha256:
             raise P9QemuError("copied release image digest does not match its source")
         copy_file_new(inputs.answers_path, answers_path)
+        copy_file_new(inputs.runtime_profile_path, runtime_path)
         copy_file_new(inputs.install_log, install_log)
+        for destination, source in preparation_artifacts.items():
+            copy_file_new(source, bundle / destination)
         for destination, source in validation_artifacts.items():
             copy_file_new(source, bundle / destination)
 
@@ -905,6 +1146,12 @@ def build_release_candidate(inputs: CandidateInputs) -> CandidateResult:
             source_sha256=private_installation_sha256,
         )
         write_json_new(public_installation_path, public_installation)
+        private_preparation_sha256 = sha256_file(inputs.preparation_manifest)
+        public_preparation = sanitize_preparation_manifest(
+            preparation,
+            source_sha256=private_preparation_sha256,
+        )
+        write_json_new(public_preparation_path, public_preparation)
         private_validation_sha256 = sha256_file(inputs.validation_manifest)
         public_validation = sanitize_validation_manifest(
             validation,
@@ -925,11 +1172,16 @@ def build_release_candidate(inputs: CandidateInputs) -> CandidateResult:
         release_manifest = _release_manifest(
             inputs=inputs,
             answers=answers,
+            runtime_profile=runtime_profile,
+            runtime_profile_sha256=runtime_profile_sha256,
             image_path=image_path,
             image_sha256=image_sha256,
             public_installation_path=public_installation_path,
             public_installation=public_installation,
             private_installation_sha256=private_installation_sha256,
+            public_preparation_path=public_preparation_path,
+            public_preparation=public_preparation,
+            private_preparation_sha256=private_preparation_sha256,
             public_validation_path=public_validation_path,
             public_validation=public_validation,
             private_validation_sha256=private_validation_sha256,

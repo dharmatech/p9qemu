@@ -11,6 +11,7 @@ from p9qemu.host import Acceleration, HostInfo
 from p9qemu.provenance import (
     artifact_record,
     build_install_manifest,
+    build_release_preparation_manifest,
     build_validation_manifest,
     qemu_img_check,
     qemu_img_info,
@@ -19,12 +20,16 @@ from p9qemu.provenance import (
     write_json_new,
     write_text_new,
 )
+from p9qemu.runtime import load_runtime_profile
 from p9qemu.validation import GuestValidationResult, ValidationCheck
 
 
 ROOT = Path(__file__).parents[1]
 REFERENCE_ANSWERS = (
     ROOT / "images" / "9front-11554-amd64-hjfs-manual-001" / "answers.toml"
+)
+RUNTIME_PROFILE = (
+    ROOT / "images" / "9front-11554-amd64-hjfs-gmt-reference-001" / "runtime.toml"
 )
 
 
@@ -69,6 +74,7 @@ def test_tool_version_and_qemu_img_evidence_parsing() -> None:
 
 def test_validation_manifest_records_immutability_and_check_categories() -> None:
     answers = load_answers(REFERENCE_ANSWERS)
+    runtime = load_runtime_profile(RUNTIME_PROFILE)
     validation = GuestValidationResult(
         (
             ValidationCheck("serial-boot", "deterministic", "passed", "booted"),
@@ -82,6 +88,8 @@ def test_validation_manifest_records_immutability_and_check_categories() -> None
         source_commit="a" * 40,
         answers=answers,
         answers_sha256="a" * 64,
+        runtime_profile=runtime,
+        runtime_profile_sha256="e" * 64,
         base_image=Path("base.qcow2"),
         base_sha256_before="b" * 64,
         base_sha256_after="b" * 64,
@@ -108,6 +116,8 @@ def test_validation_manifest_records_immutability_and_check_categories() -> None
     assert manifest["validation"]["checks"][1]["category"] == "environmental"
     assert manifest["validation"]["failure_category"] is None
     assert manifest["p9qemu"]["commit"] == "a" * 40
+    assert manifest["runtime_profile"]["sha256"] == "e" * 64
+    assert manifest["runtime_profile"]["resolved"]["target_monitor"] == "vesa"
 
 
 def test_install_manifest_binds_source_media_answers_image_and_log() -> None:
@@ -141,6 +151,45 @@ def test_install_manifest_binds_source_media_answers_image_and_log() -> None:
     assert manifest["media"]["sha256"] == answers.iso_sha256
     assert manifest["image"]["sha256"] == "c" * 64
     assert manifest["console_log"]["sha256"] == "d" * 64
+
+
+def test_preparation_manifest_binds_install_runtime_and_output_digest() -> None:
+    answers = load_answers(
+        ROOT / "images" / "9front-11554-amd64-hjfs-gmt-reference-001" / "answers.toml"
+    )
+    runtime = load_runtime_profile(RUNTIME_PROFILE)
+    manifest = build_release_preparation_manifest(
+        started_at="2026-07-15T00:00:00Z",
+        completed_at="2026-07-15T00:01:00Z",
+        source_commit="a" * 40,
+        answers=answers,
+        answers_path=Path("answers.toml"),
+        answers_sha256="b" * 64,
+        runtime_profile=runtime,
+        runtime_profile_path=Path("runtime.toml"),
+        runtime_profile_sha256="c" * 64,
+        input_image=Path("installed.qcow2"),
+        input_sha256="d" * 64,
+        input_sha256_after="d" * 64,
+        output_image=Path("prepared.qcow2"),
+        output_sha256="e" * 64,
+        input_image_info={"format": "qcow2", "dirty-flag": False},
+        output_image_info={"format": "qcow2", "dirty-flag": False},
+        input_image_check="No errors found\n",
+        output_image_check="No errors found\n",
+        host=HostInfo(system="Linux", distribution_id="ubuntu"),
+        acceleration=Acceleration("KVM", ("-accel", "kvm")),
+        memory_mib=2048,
+        qemu_system_version="QEMU 9",
+        qemu_img_version="qemu-img 9",
+        qemu_command=["qemu-system-x86_64"],
+        rendered_qemu_command="qemu-system-x86_64",
+        artifacts={"before": {"path": "plan9.ini.before.txt"}},
+    )
+    assert manifest["kind"] == "p9qemu-image-release-preparation"
+    assert manifest["image"]["input"]["unchanged"] is True
+    assert manifest["image"]["changed"] is True
+    assert manifest["runtime_profile"]["sha256"] == "c" * 64
 
 
 def test_text_writer_requires_existing_parent(tmp_path: Path) -> None:

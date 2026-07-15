@@ -8,6 +8,7 @@ import pytest
 from p9qemu.answers import load_answers
 from p9qemu.errors import P9QemuError
 from p9qemu.pexpect_validation import PexpectGuestValidationTransport
+from p9qemu.runtime import load_runtime_profile
 from p9qemu.validation import (
     GuestValidationError,
     GuestValidationProfile,
@@ -19,6 +20,9 @@ from p9qemu.validation import (
 ROOT = Path(__file__).parents[1]
 REFERENCE_ANSWERS = (
     ROOT / "images" / "9front-11554-amd64-hjfs-manual-001" / "answers.toml"
+)
+GRAPHICAL_RUNTIME = (
+    ROOT / "images" / "9front-11554-amd64-hjfs-gmt-reference-001" / "runtime.toml"
 )
 
 
@@ -78,6 +82,18 @@ def test_profile_is_derived_from_resolved_install_answers() -> None:
     assert validation.timezone == "US_Pacific"
     assert "/usr/glenda/lib/profile" in validation.stock_home_files
     assert validation.root_partition == "/dev/sd00/fs"
+    assert "console=0" in validation.plan9_ini_values
+
+
+def test_profile_can_validate_qualified_graphical_runtime() -> None:
+    answers = load_answers(
+        ROOT / "images" / "9front-11554-amd64-hjfs-gmt-reference-001" / "answers.toml"
+    )
+    runtime = load_runtime_profile(GRAPHICAL_RUNTIME)
+    validation = build_guest_validation_profile(answers, runtime)
+    assert "mouseport=ps2" in validation.plan9_ini_values
+    assert "monitor=vesa" in validation.plan9_ini_values
+    assert "vgasize=1024x768x16" in validation.plan9_ini_values
     assert "console=0" in validation.plan9_ini_values
 
 

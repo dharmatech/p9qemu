@@ -19,6 +19,7 @@ from p9qemu.answers import InstallAnswers
 from p9qemu.errors import P9QemuError
 from p9qemu.host import Acceleration, HostInfo
 from p9qemu.media import sha256_file
+from p9qemu.runtime import RuntimeBootProfile
 from p9qemu.validation import GuestValidationResult
 
 
@@ -260,6 +261,93 @@ def build_install_manifest(
     }
 
 
+def build_release_preparation_manifest(
+    *,
+    started_at: str,
+    completed_at: str,
+    source_commit: str,
+    answers: InstallAnswers,
+    answers_path: Path,
+    answers_sha256: str,
+    runtime_profile: RuntimeBootProfile,
+    runtime_profile_path: Path,
+    runtime_profile_sha256: str,
+    input_image: Path,
+    input_sha256: str,
+    input_sha256_after: str,
+    output_image: Path,
+    output_sha256: str,
+    input_image_info: Mapping[str, object],
+    output_image_info: Mapping[str, object],
+    input_image_check: str,
+    output_image_check: str,
+    host: HostInfo,
+    acceleration: Acceleration,
+    memory_mib: int,
+    qemu_system_version: str,
+    qemu_img_version: str,
+    qemu_command: list[str],
+    rendered_qemu_command: str,
+    artifacts: Mapping[str, Mapping[str, object]],
+) -> dict[str, object]:
+    """Build the private manifest for a qualified post-install transformation."""
+
+    return {
+        "schema": 1,
+        "kind": "p9qemu-image-release-preparation",
+        "status": "passed",
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "p9qemu": {"version": __version__, "commit": source_commit},
+        "answers": {
+            "path": str(answers_path),
+            "sha256": answers_sha256,
+            "resolved": asdict(answers),
+        },
+        "runtime_profile": {
+            "path": str(runtime_profile_path),
+            "sha256": runtime_profile_sha256,
+            "resolved": asdict(runtime_profile),
+        },
+        "image": {
+            "input": {
+                "path": str(input_image),
+                "sha256": input_sha256,
+                "sha256_after": input_sha256_after,
+                "unchanged": input_sha256 == input_sha256_after,
+                "qemu_img_info": dict(input_image_info),
+                "qemu_img_check": input_image_check,
+            },
+            "output": {
+                "path": str(output_image),
+                "sha256": output_sha256,
+                "qemu_img_info": dict(output_image_info),
+                "qemu_img_check": output_image_check,
+            },
+            "changed": input_sha256 != output_sha256,
+        },
+        "host": {
+            "system": host.system,
+            "distribution_id": host.distribution_id,
+            "distribution_name": host.distribution_name,
+            "version_id": host.version_id,
+            "architecture": platform.machine(),
+            "kernel": platform.release(),
+        },
+        "qemu": {
+            "system_version": qemu_system_version,
+            "img_version": qemu_img_version,
+            "acceleration": acceleration.name,
+            "memory_mib": memory_mib,
+            "command": {
+                "argv": qemu_command,
+                "rendered": rendered_qemu_command,
+            },
+        },
+        "artifacts": {name: dict(record) for name, record in artifacts.items()},
+    }
+
+
 def build_validation_manifest(
     *,
     status: str,
@@ -268,6 +356,8 @@ def build_validation_manifest(
     source_commit: str,
     answers: InstallAnswers,
     answers_sha256: str,
+    runtime_profile: RuntimeBootProfile | None = None,
+    runtime_profile_sha256: str | None = None,
     base_image: Path,
     base_sha256_before: str,
     base_sha256_after: str,
@@ -294,7 +384,7 @@ def build_validation_manifest(
     checks = (
         [] if validation is None else [asdict(check) for check in validation.checks]
     )
-    return {
+    manifest = {
         "schema": 1,
         "kind": "p9qemu-image-validation",
         "status": status,
@@ -344,3 +434,13 @@ def build_validation_manifest(
         },
         "artifacts": {name: dict(record) for name, record in artifacts.items()},
     }
+    if runtime_profile is not None:
+        if runtime_profile_sha256 is None:
+            raise P9QemuError(
+                "runtime profile SHA-256 is required when recording a profile"
+            )
+        manifest["runtime_profile"] = {
+            "sha256": runtime_profile_sha256,
+            "resolved": asdict(runtime_profile),
+        }
+    return manifest

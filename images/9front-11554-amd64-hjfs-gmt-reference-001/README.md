@@ -9,8 +9,8 @@ The profile deliberately keeps the familiar 9front defaults `cirno` and
 `glenda`, installs HJFS on a fresh 30 GiB QCOW2 disk, uses automatic guest
 networking, and selects `GMT` for geographically neutral, daylight-saving-free
 timestamps. It does not configure passwords, authentication secrets, Drawterm,
-or other additional remote services, and it has no post-install customization
-stage.
+or other additional remote services. The installation answer file remains
+separate from the qualified post-install runtime profile in `runtime.toml`.
 
 Before promotion, disposable-overlay validation must confirm the expected
 user, home, system name, persistent timezone, the pinned stock home-file baseline,
@@ -36,11 +36,10 @@ vgasize=1024x768x16
 boot
 ```
 
-The publication workflow must make an explicit product decision before using
-this profile as a general ready-to-run image: either describe it as
-console-first, or produce and separately identify a graphical-default image.
-Changing `plan9.ini` would create a different image digest and therefore a new
-candidate; the retained candidate must not be edited in place.
+The product decision is now recorded in `runtime.toml`. Candidate `001` remains
+console-first and immutable. A future candidate `002` is built from a fresh
+installed disk by applying the qualified graphical-plus-serial values to a new
+copy, recording the input and output digests, and validating that exact output.
 
 ## Local candidate checkpoint
 
@@ -97,3 +96,26 @@ relative mouse input was unusable. Repeating the run with GTK fixed the input
 problem while changing no guest setting. This is a host display-backend result:
 Linux should retain its proven GTK/default display path, while Windows WHPX
 continues to require the separately proven SDL profile.
+
+## Candidate 002 build contract
+
+The experiment has been promoted into first-class build inputs without
+promoting its disposable disk. `runtime.toml` strictly binds the GMT installer
+profile to the expected console-oriented source values and graphical target
+values. The release-preparation driver refuses missing, duplicate, or
+unexpected selected settings before writing the guest file.
+
+The candidate digest chain is explicit:
+
+```text
+fresh installed image
+  -> qualified release preparation
+  -> graphical-plus-serial image
+  -> immutable-overlay validation
+  -> local candidate 002 bundle
+```
+
+The installation manifest binds the first image. The preparation manifest
+binds both image digests plus the answer and runtime-profile digests. Validation
+and promotion bind the second image. A normal user boot does not send the
+serial marker or any validation command.

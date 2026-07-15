@@ -99,11 +99,19 @@ release-candidate-001/
   p9qemu-9front-11554-amd64-hjfs-001/
     p9qemu-9front-11554-amd64-hjfs-001.qcow2
     answers.toml
+    runtime.toml
     install.raw.log
     RUNNING.md
     manifest.json
     installation/
       manifest.json
+    preparation/
+      manifest.json
+      preparation.raw.log
+      plan9.ini.before.txt
+      plan9.ini.after.txt
+      qemu-img-check-input.txt
+      qemu-img-check-output.txt
     validation/
       manifest.json
       boot.raw.log
@@ -154,8 +162,10 @@ $ uv run python tools/build_release_candidate.py \
     --source-commit COMMIT \
     --disk RUN/target.qcow2 \
     --answers RUN/answers.toml \
+    --runtime-profile RUN/runtime.toml \
     --install-log RUN/console.raw.log \
     --install-manifest RUN/install-manifest.json \
+    --preparation-manifest RUN/preparation/manifest.json \
     --validation-manifest RUN/overlay-validation/manifest.json \
     --output-dir RUN/release-candidate-001 \
     --confirm-image-hygiene-reviewed
@@ -420,3 +430,39 @@ available. No QEMU process, forwarded-port listener, `.part` file, or validation
 overlay remained after postflight. The failed SDL QCOW2 was then removed after
 its command, logs, hashes, manifest, and structural checks had been preserved;
 the remaining successful disk and all evidence occupied approximately 529 MiB.
+
+#### First-class candidate 002 preparation boundary (2026-07-15)
+
+The proven experiment is now represented by a strict runtime profile rather
+than by special validation expectations. The answer file continues to describe
+the console-driven installer. `runtime.toml` separately binds that installer
+profile to these exact source and target states:
+
+```text
+source: mouseport=ask, monitor=ask, vgasize=text, console=0
+target: mouseport=ps2, monitor=vesa, vgasize=1024x768x16, console=0
+```
+
+`tools/prepare_release_image.py` preserves the installed image, creates a new
+copy, verifies that every selected source setting occurs exactly once, applies
+only the changed values, verifies the staged and installed target state, and
+halts cleanly. Its private preparation manifest binds the answer file, runtime
+profile, source commit, input image, output image, QEMU environment, serial
+transcript, before/after files, and structural checks.
+
+The ordinary `tools/validate_image.py` accepts `--runtime-profile`; it no longer
+needs an experiment-only replacement of expected `plan9.ini` values. Candidate
+promotion requires all three private stages and enforces this digest chain:
+
+```text
+installation manifest image SHA-256
+  == preparation input SHA-256
+preparation output SHA-256
+  == validation base SHA-256
+  == promoted candidate image SHA-256
+```
+
+The public bundle includes a sanitized preparation manifest and selected
+path-free evidence. Candidate `001` remains unchanged. The successful
+experimental disk remains proof only and is not eligible to be relabeled as
+candidate `002`.

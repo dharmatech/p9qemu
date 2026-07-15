@@ -1,0 +1,20 @@
+# Qualified graphical runtime applied after the console-driven installation.
+
+schema = 1
+profile_id = "9front-11554-amd64-graphical-serial-v1"
+installer_profile = "9front-11554-amd64-hjfs-gmt-v1"
+
+[plan9_ini]
+path = "/n/9fat/plan9.ini"
+
+[plan9_ini.source]
+mouseport = "ask"
+monitor = "ask"
+vgasize = "text"
+console = "0"
+
+[plan9_ini.target]
+mouseport = "ps2"
+monitor = "vesa"
+vgasize = "1024x768x16"
+console = "0"
