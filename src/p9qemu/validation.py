@@ -299,7 +299,7 @@ def drive_guest_validation(
         state="guest.plan9-ini",
         command="cat /n/9fat/plan9.ini",
         expected=profile.plan9_ini_values,
-        detail="installed plan9.ini contains the resolved serial boot settings",
+        detail="installed plan9.ini contains the resolved boot settings",
     )
 
     if network_mode == "skip":

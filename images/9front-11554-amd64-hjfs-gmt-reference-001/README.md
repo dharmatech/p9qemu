@@ -65,3 +65,35 @@ boot reached the expected text terminal, where `glenda`, `cirno`,
 second boot with the temporary graphical settings above reached Rio and was
 fast and responsive. Both the base and writable test copy passed `qemu-img
 check` afterward, and the read-only base retained the SHA-256 recorded above.
+
+## Graphical runtime experiment
+
+A later disposable Linux/KVM experiment established that `console=0` does not
+need to be removed for a graphical runtime image. A fresh copy of this
+candidate retained `console=0` while changing only:
+
+```text
+mouseport=ps2
+monitor=vesa
+vgasize=1024x768x16
+```
+
+With QEMU's GTK display backend under WSLg, the copy booted directly into a
+responsive Rio while the dedicated COM1 channel independently reached
+`term%`. A command sent by Pexpect through COM1 executed after graphical
+initialization and appeared in a Rio terminal. The same serial transcript then
+captured `glenda`, `cirno`, GMT, a successful Internet ping, and `fshalt` from
+the graphical session.
+
+The resulting graphical experiment disk was marked read-only and validated
+headlessly through a disposable overlay without a temporary text-mode boot.
+All ten checks passed, required networking succeeded, the base digest remained
+unchanged, and the successful overlay was removed. This proves the intended
+architecture for a future candidate, but it does not change the immutable
+console-first candidate identified above.
+
+Linux SDL under WSLg also reached Rio with the same guest settings, but its
+relative mouse input was unusable. Repeating the run with GTK fixed the input
+problem while changing no guest setting. This is a host display-backend result:
+Linux should retain its proven GTK/default display path, while Windows WHPX
+continues to require the separately proven SDL profile.

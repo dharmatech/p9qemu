@@ -340,3 +340,83 @@ The existing candidate must not be modified in place because its image and
 archive digests are already part of the provenance record. Windows free space
 after the test was 172,179,492,864 bytes, and the Ubuntu WSL VHDX remained
 219,465,908,224 bytes.
+
+#### Graphical runtime with retained serial console (2026-07-15)
+
+The next experiment tested whether a future graphical-default image could keep
+the serial channel required by automation. It did not mutate candidate `001`.
+Two fresh disposable copies started with the exact candidate image SHA-256
+`0bed74080dd8e3ece1d50731ef7766425e3b806c89e215ea8951cc006fbf25ca`.
+A recorded serial preparation changed only these persistent `plan9.ini`
+values:
+
+```text
+mouseport=ask              -> mouseport=ps2
+monitor=ask                -> monitor=vesa
+vgasize=text               -> vgasize=1024x768x16
+console=0                     console=0
+```
+
+The preparation driver verified the original, staged, and installed files from
+inside 9front, completed `fshalt`, and preserved its QEMU command, raw serial
+log, before/after files, hashes, and `qemu-img` evidence. The different output
+hashes from the two equivalent preparations reinforced that this process is
+auditable rather than bit-reproducible.
+
+The controlled display matrix produced:
+
+| Host profile | Guest result | Serial result | Input result | Outcome |
+| --- | --- | --- | --- | --- |
+| Linux KVM plus SDL under WSLg | Rio started | HJFS and `init` were recorded; a later `term%` appeared | Button events arrived, but relative pointer motion and selection were unusable | Failed host display profile; QEMU was closed without guest shutdown and the disk still passed `qemu-img check` |
+| Linux KVM plus GTK under WSLg | Rio started directly | Post-graphics `term%` appeared and a Pexpect marker command executed | Mouse, menus, terminals, and windows behaved normally | Passed |
+
+The successful GTK serial transcript captured both automation and graphical
+session activity. It recorded the Pexpect marker, active user `glenda`, system
+name `cirno`, GMT, a successful `ip/ping -n 1 google.com`, and `done halting`.
+The screenshot of the marker in a Rio terminal confirmed that the serial input
+path remained usable after graphical initialization rather than merely
+receiving boot output.
+
+The successful graphical experiment disk was then marked read-only at SHA-256
+`17b67ed3edfb90f881a33f79a4a52010da3d8a3496c0566d96d2901f9c247e4d`.
+The ordinary headless KVM validator attached only a disposable overlay and
+expected the graphical runtime `plan9.ini`. Without any temporary
+`vgasize=text` override, it passed all ten checks: serial boot, HJFS root,
+user, home, system name, GMT, stock-home inventory, graphical boot settings,
+required networking, and orderly shutdown. The read-only base hash was
+unchanged and the successful overlay was removed.
+
+Three development-only drivers preserve the exact procedure:
+
+- `tools/prepare_graphical_experiment.py` performs the explicitly confirmed,
+  hash-gated guest-side preparation and records the before/after evidence;
+- `tools/run_graphics_serial_experiment.py` runs the selected host display with
+  a dedicated logged serial channel and probes the post-graphics shell; and
+- `tools/validate_graphical_experiment.py` applies the normal guest-validation
+  state machine to a read-only graphical base through a disposable overlay.
+
+They are evidence-producing development interfaces, not public CLI commands or
+the final candidate `002` build design. The preparation and run drivers refuse
+non-experiment disk names and require exact input hashes. The validator refuses
+a writable base and removes only a successful overlay.
+
+This establishes a simpler candidate `002` architecture:
+
+```text
+same immutable graphical image
+├── user boot: host graphical display + console=0 -> Rio and COM1 term%
+└── validator boot: -nographic + console=0 -> the same COM1 term%
+```
+
+No final switch from serial to graphics and no validation-only text override
+is required. The serial console and VGA framebuffer are independent; terminal
+startup calls `screenrc`, and the earlier Rio failure resulted from
+`vgasize=text`, not from `console=0`.
+
+The local experiment directory occupied approximately 1.1 GiB before optional
+failed-disk cleanup. Windows free space was 172,645,380,096 bytes, the Ubuntu
+WSL VHDX remained 219,465,908,224 bytes, and WSL reported 884,565,340,160 bytes
+available. No QEMU process, forwarded-port listener, `.part` file, or validation
+overlay remained after postflight. The failed SDL QCOW2 was then removed after
+its command, logs, hashes, manifest, and structural checks had been preserved;
+the remaining successful disk and all evidence occupied approximately 529 MiB.
