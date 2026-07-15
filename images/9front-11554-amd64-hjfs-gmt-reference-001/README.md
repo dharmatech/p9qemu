@@ -147,3 +147,16 @@ Rio intentionally displayed stats plus two terminal windows. Stock 9front's
 `console=0`, a second `window -scroll console` for COM1. That second terminal is
 the visible side of the retained serial automation channel, not a leftover
 validation command.
+
+The exact archive also passed the native Windows gate. On Windows 11 25H2
+build 26200.8655 with QEMU 10.2.0, a read-only extracted base and separate
+disposable overlays passed both the explicit p9qemu WHPX profile
+(`kernel-irqchip=off` plus SDL) and the explicit TCG fallback profile. Each run
+automatically passed through 9boot, presented the expected `bootargs` and
+`user[glenda]:` prompts, reached responsive Rio, provided working mouse and
+terminal input, reached Google through `ip/ping`, and exited cleanly through
+`fshalt`. TCG took noticeably longer to open its graphical window than WHPX.
+
+Both overlays and the base passed `qemu-img check`, all forwarding listeners
+were released, and the immutable image and archive digests remained unchanged.
+Nothing was uploaded.

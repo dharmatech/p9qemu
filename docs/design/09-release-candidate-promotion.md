@@ -519,3 +519,39 @@ launches one ordinary terminal and conditionally launches `window -scroll
 console` when `console=0` is configured. The second terminal is therefore the
 intentional visible COM1 channel rather than guest customization or leaked
 validation input.
+
+#### Exact graphical candidate 002 Windows gate (2026-07-15)
+
+The exact candidate archive was copied from the authoritative WSL run into a
+dedicated native-Windows test directory. The 250,529,927-byte copy retained
+SHA-256
+`ddf9086ab7925e891ea6d577474f70a6eccd91dccc85d5fc29b0d3acf29b6c4d`.
+Every extracted public artifact matched its manifest size and digest, the
+QCOW2 passed `qemu-img check`, and its SHA-256 was
+`1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8`.
+The extracted base was marked read-only. Separate QCOW2 overlays isolated the
+WHPX and TCG tests.
+
+The host ran Windows 11 25H2 build 26200.8655 and QEMU 10.2.0. Tests used the
+current p9qemu checkout at commit
+`3623b9da788f2ecbbc0478d3766c7fc01c24421c`; all 134 repository tests passed
+before the gate. Explicit dry runs proved that neither test could silently use
+the other accelerator.
+
+| Host profile | Boot and Rio | Input and network | Shutdown | Outcome |
+| --- | --- | --- | --- | --- |
+| `-accel whpx,kernel-irqchip=off -display sdl` | Automatic 9boot, the expected `bootargs` and `user[glenda]:` prompts, then responsive Rio | Mouse, menus, terminal input, and `ip/ping -n 1 google.com` passed | `fshalt` closed QEMU | Passed; QEMU reported that WHPX was operational |
+| `-accel tcg` with QEMU's default display | The window appeared after a noticeable startup delay; automatic 9boot, both prompts, and responsive Rio then passed | Mouse, menus, terminal input, and the same ping passed | `fshalt` closed QEMU | Passed as the portable software-emulation fallback |
+
+Both live runs exposed exactly the seven configured forwarding listeners from
+their QEMU process. After each shutdown, QEMU and all listeners were gone.
+Both overlays and the base passed `qemu-img check`; the read-only base and the
+Windows archive copy retained their exact digests. Rio showed the expected
+stats window and two terminals in both profiles. Nothing was uploaded.
+
+The native gate occupied 811,049,742 bytes before cleanup. After preserving
+9,983 bytes of commands, environment metadata, live-state records, structural
+checks, and results, the copied archive, extracted base, and both overlays were
+removed. Windows free space was 172,549,128,192 bytes. The Ubuntu WSL VHDX
+remained 219,465,908,224 bytes and WSL reported 883,190,566,912 bytes
+available; the authoritative WSL candidate was retained.
