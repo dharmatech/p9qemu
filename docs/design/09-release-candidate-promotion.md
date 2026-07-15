@@ -466,3 +466,56 @@ The public bundle includes a sanitized preparation manifest and selected
 path-free evidence. Candidate `001` remains unchanged. The successful
 experimental disk remains proof only and is not eligible to be relabeled as
 candidate `002`.
+
+#### Fresh graphical candidate 002 exercise (2026-07-15)
+
+Source commit `778563fe26358c1acc76aedd72966cbca7807f78` produced a fresh
+automated GMT/HJFS installation. The installation completed every qualified
+11554 state through `finish.rebooting` and recorded:
+
+- installed image SHA-256
+  `60aa524ba33e903086eb708b96f843ba21270664476e9b1484d5c23c877d7103`;
+- answer SHA-256
+  `c0a2ab375a50a22cebda4d45dbb6481630d236d6aaff6c58cb77481fd81c294e`;
+- runtime-profile SHA-256
+  `44a7413cffb9374c9114d8543b107a7d27a0d53dd2dd814db2a28022f3011adb`;
+  and
+- installation transcript SHA-256
+  `e3a526a5833d26e2f894c4d506f0261437735c700271ae9ae8da1011289f8df6`.
+
+Release preparation copied rather than mutated the installed artifact,
+verified every source and target setting exactly, retained `console=0`, halted
+cleanly, and produced image SHA-256
+`1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8`.
+The installed source digest remained unchanged. Standard validation consumed
+the checked-in runtime profile, passed all ten required checks including
+networking and orderly shutdown, removed its successful overlay, and left the
+prepared base unchanged.
+
+Promotion dry-run verified the complete digest chain, eight selected public
+evidence files, and the public-text privacy scan. Local promotion then created
+and round-trip verified
+`p9qemu-9front-11554-amd64-hjfs-gmt-002.tar.gz` at SHA-256
+`ddf9086ab7925e891ea6d577474f70a6eccd91dccc85d5fc29b0d3acf29b6c4d`.
+Nothing was uploaded.
+
+An independent clean-room extraction verified the archive checksum, exact
+image checksum, and QCOW2 structure, then repeated the required-network
+immutable-overlay validation successfully. A human Linux/KVM boot through
+ordinary `p9qemu start` automatically passed through 9boot when left
+untouched, then presented the stock `bootargs` and `user[glenda]:` prompts.
+Accepting both defaults reached responsive Rio with working mouse input.
+`fshalt` closed QEMU, all forwarding listeners were released, the disposable
+graphical overlay passed `qemu-img check`, and the exact extracted base retained
+its recorded digest.
+
+The first graphical launch attempt used an incorrectly detached WSL shell and
+QEMU received host-side SIGHUP when that shell exited. Its overlay remained
+clean. Keeping the Windows `wsl.exe` host process alive for the QEMU lifetime
+fixed the test harness; this was not a guest or candidate failure.
+
+Rio displayed stats plus two terminal windows. Stock 9front's `riostart`
+launches one ordinary terminal and conditionally launches `window -scroll
+console` when `console=0` is configured. The second terminal is therefore the
+intentional visible COM1 channel rather than guest customization or leaked
+validation input.

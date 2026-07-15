@@ -119,3 +119,31 @@ The installation manifest binds the first image. The preparation manifest
 binds both image digests plus the answer and runtime-profile digests. Validation
 and promotion bind the second image. A normal user boot does not send the
 serial marker or any validation command.
+
+## Local graphical candidate 002
+
+A fresh source-bound run produced local-only candidate
+`p9qemu-9front-11554-amd64-hjfs-gmt-002`. The installed console-first image
+SHA-256 was
+`60aa524ba33e903086eb708b96f843ba21270664476e9b1484d5c23c877d7103`.
+Recorded release preparation preserved that input and produced graphical image
+SHA-256
+`1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8`.
+The deterministic local archive SHA-256 was
+`ddf9086ab7925e891ea6d577474f70a6eccd91dccc85d5fc29b0d3acf29b6c4d`.
+
+The exact archive passed checksum and safe round-trip verification,
+`qemu-img check`, required-network immutable-overlay validation, and an
+independent clean-room Linux validation. A human Linux/KVM boot from a
+disposable overlay on the exact extracted image automatically passed through
+9boot, presented the expected `bootargs` and `user[glenda]:` prompts, and
+reached responsive Rio after accepting both defaults. Mouse input worked and
+`fshalt` closed QEMU. All forwarding ports were released, the overlay passed
+`qemu-img check`, and the immutable base retained its recorded digest. Nothing
+was uploaded.
+
+Rio intentionally displayed stats plus two terminal windows. Stock 9front's
+`riostart` opens one ordinary terminal and, because this profile preserves
+`console=0`, a second `window -scroll console` for COM1. That second terminal is
+the visible side of the retained serial automation channel, not a leftover
+validation command.
