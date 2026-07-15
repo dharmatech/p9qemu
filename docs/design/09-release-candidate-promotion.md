@@ -174,6 +174,12 @@ $ uv run python tools/build_release_candidate.py \
 `--dry-run` performs the expensive source hashes, validation binding, evidence
 verification, and text scan without copying the image or creating output.
 
+After a candidate has been built and reviewed, the separate local manifest
+generator streams the exact archive and derives its external `image.json`
+without extracting the QCOW2. That consumer-facing metadata step is documented
+in [`10-ready-image-manifest-and-cache.md`](10-ready-image-manifest-and-cache.md).
+It remains non-publishing and cannot weaken or replace this promotion boundary.
+
 ## Publication remains separate
 
 A locally successful candidate is not automatically a release. The publication

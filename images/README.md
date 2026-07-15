@@ -29,4 +29,4 @@ boundary are documented in
 
 ## Ready-image manifest examples
 
-- [`p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json`](manifests/p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json) — exact local candidate-002 metadata with an intentionally non-downloadable placeholder URL.
+- [`p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json`](manifests/p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json) — exact local candidate-002 metadata and the byte-for-byte acceptance target for the streaming generator, with an intentionally non-downloadable placeholder URL.

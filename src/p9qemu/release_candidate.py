@@ -73,6 +73,7 @@ _REQUIRED_VALIDATION_CHECKS = {
     "orderly-shutdown",
 }
 _MAX_ARCHIVE_MEMBERS = 4096
+_MAX_ARCHIVE_EXTRACTED_BYTES = 64 * 1024**3
 
 
 @dataclass(frozen=True)
@@ -109,6 +110,18 @@ class CandidateResult:
     image_sha256: str
     manifest: Path
     verification: Path
+
+
+@dataclass(frozen=True)
+class ReleaseArchiveInventory:
+    bundle_name: str
+    members: tuple[tuple[tarfile.TarInfo, PurePosixPath], ...]
+    file_count: int
+    extracted_size: int
+
+    @property
+    def member_count(self) -> int:
+        return len(self.members)
 
 
 def validate_identity(image_id: str, build_id: str) -> CandidateIdentity:
@@ -890,6 +903,92 @@ def _safe_archive_member(member: tarfile.TarInfo, bundle_name: str) -> PurePosix
     return path
 
 
+def inspect_release_archive_headers(
+    tar: tarfile.TarFile,
+    *,
+    expected_bundle_name: str | None = None,
+    expected_member_count: int | None = None,
+    expected_file_count: int | None = None,
+    expected_extracted_size: int | None = None,
+) -> ReleaseArchiveInventory:
+    """Validate a release archive's complete header inventory without extraction."""
+
+    members: list[tuple[tarfile.TarInfo, PurePosixPath]] = []
+    seen: set[str] = set()
+    directories: set[str] = set()
+    bundle_name = expected_bundle_name
+    file_count = 0
+    extracted_size = 0
+    for member in tar:
+        if len(members) >= _MAX_ARCHIVE_MEMBERS:
+            raise P9QemuError(
+                "release archive exceeds the supported member-count limit"
+            )
+        if bundle_name is None:
+            member_name = (
+                member.name[:-1]
+                if member.isdir() and member.name.endswith("/")
+                else member.name
+            )
+            try:
+                first_path = portable_relative_path(member_name, "release archive path")
+            except P9QemuError as error:
+                raise P9QemuError(
+                    f"release archive contains an unsafe path: {member.name}"
+                ) from error
+            bundle_name = first_path.parts[0]
+
+        relative = _safe_archive_member(member, bundle_name)
+        normalized = relative.as_posix()
+        if not members and (normalized != bundle_name or not member.isdir()):
+            raise P9QemuError(
+                "release archive must begin with its bundle-root directory"
+            )
+        if normalized in seen:
+            raise P9QemuError(
+                f"release archive contains a duplicate entry: {normalized}"
+            )
+        seen.add(normalized)
+        if relative.parent != PurePosixPath(".") and (
+            relative.parent.as_posix() not in directories
+        ):
+            raise P9QemuError(
+                f"archive entry appears before its parent directory: {normalized}"
+            )
+        if member.isdir():
+            directories.add(normalized)
+        else:
+            if member.size < 0:
+                raise P9QemuError(
+                    f"release archive contains a negative file size: {normalized}"
+                )
+            file_count += 1
+            extracted_size += member.size
+            if extracted_size > _MAX_ARCHIVE_EXTRACTED_BYTES:
+                raise P9QemuError(
+                    "release archive exceeds the supported extracted-size limit"
+                )
+        members.append((member, relative))
+
+    if bundle_name is None:
+        raise P9QemuError("release archive contains no members")
+    if expected_member_count is not None and len(members) != expected_member_count:
+        raise P9QemuError("release archive member count does not match image.json")
+    if expected_file_count is not None and file_count != expected_file_count:
+        raise P9QemuError("release archive file count does not match image.json")
+    if (
+        expected_extracted_size is not None
+        and extracted_size != expected_extracted_size
+    ):
+        raise P9QemuError("release archive extracted size does not match image.json")
+    return ReleaseArchiveInventory(
+        bundle_name=bundle_name,
+        members=tuple(members),
+        file_count=file_count,
+        extracted_size=extracted_size,
+    )
+
+
 def extract_release_archive(
     archive: Path,
     destination: Path,
@@ -908,66 +1007,15 @@ def extract_release_archive(
     destination.mkdir()
     try:
         with tarfile.open(archive, mode="r:gz") as tar:
-            members: list[tarfile.TarInfo] = []
-            for member in tar:
-                members.append(member)
-                if len(members) > _MAX_ARCHIVE_MEMBERS:
-                    raise P9QemuError(
-                        "release archive exceeds the supported member-count limit"
-                    )
-            if (
-                expected_member_count is not None
-                and len(members) != expected_member_count
-            ):
-                raise P9QemuError(
-                    "release archive member count does not match image.json"
-                )
-            seen: set[str] = set()
-            directories: set[str] = set()
-            validated: list[tuple[tarfile.TarInfo, PurePosixPath]] = []
-            file_count = 0
-            extracted_size = 0
-            for member in members:
-                relative = _safe_archive_member(member, bundle_name)
-                normalized = relative.as_posix()
-                if normalized in seen:
-                    raise P9QemuError(
-                        f"release archive contains a duplicate entry: {normalized}"
-                    )
-                seen.add(normalized)
-                if normalized == bundle_name and not member.isdir():
-                    raise P9QemuError("release archive bundle root is not a directory")
-                if relative.parent != PurePosixPath(".") and (
-                    relative.parent.as_posix() not in directories
-                ):
-                    raise P9QemuError(
-                        "archive entry appears before its parent directory: "
-                        f"{normalized}"
-                    )
-                if member.isdir():
-                    directories.add(normalized)
-                else:
-                    if member.size < 0:
-                        raise P9QemuError(
-                            f"release archive contains a negative file size: {normalized}"
-                        )
-                    file_count += 1
-                    extracted_size += member.size
-                validated.append((member, relative))
+            inventory = inspect_release_archive_headers(
+                tar,
+                expected_bundle_name=bundle_name,
+                expected_member_count=expected_member_count,
+                expected_file_count=expected_file_count,
+                expected_extracted_size=expected_extracted_size,
+            )
 
-            if expected_file_count is not None and file_count != expected_file_count:
-                raise P9QemuError(
-                    "release archive file count does not match image.json"
-                )
-            if (
-                expected_extracted_size is not None
-                and extracted_size != expected_extracted_size
-            ):
-                raise P9QemuError(
-                    "release archive extracted size does not match image.json"
-                )
-
-            for member, relative in validated:
+            for member, relative in inventory.members:
                 normalized = relative.as_posix()
                 target = destination.joinpath(*relative.parts)
                 if member.isdir():
