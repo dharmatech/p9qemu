@@ -370,6 +370,68 @@ public-URL download, immutable-cache installation, writable-overlay creation,
 Linux boot, and Windows boot gates are pending. Existing assets and this tag
 must never be replaced; a correction requires candidate `003`.
 
+### Public prerelease and Linux acceptance (2026-07-15)
+
+The candidate was published as a non-Latest GitHub prerelease at
+[`ready-9front-11554-amd64-hjfs-gmt-002`](https://github.com/dharmatech/p9qemu/releases/tag/ready-9front-11554-amd64-hjfs-gmt-002).
+Its lightweight tag points exactly to commit
+`5051229af7e5aa28b64abfc497c2ca7e01e97f09`, which contains the final
+manifest and publication authorization. The release was first constructed as
+a draft and contained exactly two uploaded assets. GitHub's server-side
+metadata independently reported:
+
+| Asset | Bytes | Server SHA-256 |
+| --- | ---: | --- |
+| `image.json` | 1344 | `cfee07ec6fcf82d15ce77b43d8633f696e92118f8cff166a766ccdc9c05dfc53` |
+| `p9qemu-9front-11554-amd64-hjfs-gmt-002.tar.gz` | 250529927 | `ddf9086ab7925e891ea6d577474f70a6eccd91dccc85d5fc29b0d3acf29b6c4d` |
+
+After draft verification, publication preserved prerelease status and created
+the expected public tag without changing either asset. A body-free request to
+the public archive URL returned its exact byte length, a strong ETag,
+Last-Modified, and byte-range support. An isolated native-Windows
+`p9qemu image create --dry-run` fetched the public 1344-byte manifest, stored
+it under the expected manifest digest, printed the pinned archive and image
+digests, and created no archive or instance.
+
+The clean WSL checkout was fast-forwarded to the exact tagged commit, where all
+186 tests passed under Linux. A previously absent acceptance root used a
+dedicated `XDG_CACHE_HOME`. The public CLI then:
+
+1. fetched and verified the external manifest;
+2. downloaded the public archive in 31.4 seconds and matched its SHA-256;
+3. safely extracted and fully reverified every bundle artifact;
+4. confirmed the cached base was standalone and marked it read-only;
+5. created and verified the absolute-path writable overlay; and
+6. rendered the expected Linux KVM launch command through
+   `p9qemu start --instance --dry-run`.
+
+The preboot base SHA-256 was
+`1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8`.
+The new overlay was clean, reported the exact cached backing path and QCOW2
+backing format, presented 32212254720 virtual bytes, and occupied 200704 bytes.
+No partial file or acquisition lock remained.
+
+The attached `p9qemu start --instance` process selected KVM and kept the WSL
+host process alive for the complete graphical test. Leaving 9boot untouched,
+accepting the default `bootargs` and `user[glenda]:` prompts reached Rio. The
+desktop appeared normal, and `ip/ping -n 1 google.com` succeeded. The requested
+`fshalt` closed QEMU with host status 0.
+
+Postboot, the complete instance verifier passed again. Both the immutable base
+and overlay passed `qemu-img check`; the base digest was unchanged; and the
+overlay remained clean, retained its exact backing relationship, and occupied
+659456 bytes. No QEMU process, forwarded-port listener, `.part` file, or
+acquisition lock remained.
+
+Before publication, Windows reported 172459266048 free bytes (160.62 GiB), and
+the Ubuntu VHDX was 219465908224 bytes (204.39 GiB). After public download,
+boot, and integrity checks, Windows reported 172461211648 free bytes and the
+VHDX remained exactly 219465908224 bytes. The retained isolated Linux cache
+and instance occupy 810403180 logical bytes at
+`~/vm/p9qemu-ready-11554-candidate-002-acceptance`. The two exact Windows
+temporary staging directories were verified and removed; the Linux tree is
+retained until the Windows public-CLI gate and cleanup decision are complete.
+
 ### Streaming-generator acceptance (2026-07-15)
 
 The generator was run from native Windows against the retained candidate-002
@@ -390,10 +452,13 @@ publication occurred.
 
 The next useful increments are intentionally separable:
 
-1. perform an explicitly approved live-download acceptance test through the
-   public CLI;
-2. perform an explicitly approved QEMU boot through a durable overlay; and
-3. only then define the reviewed GitHub publication procedure and catalog.
+1. repeat isolated public-URL acquisition, instance creation, and a graphical
+   boot on native Windows;
+2. record the user-facing image page with P9QEMU and direct-QEMU commands;
+3. decide whether candidate 002 is promoted beyond prerelease status or
+   remains a permanently identified reference candidate; and
+4. clean up the retained disposable acceptance instances after their evidence
+   is no longer needed.
 
 Additional selection conveniences remain open. The current command accepts an
 exact manifest URL; a future command may also accept an exact catalog ID.
