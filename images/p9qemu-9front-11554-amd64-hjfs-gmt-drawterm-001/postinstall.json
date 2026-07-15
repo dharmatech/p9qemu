@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "kind": "p9qemu-9front-postinstall",
+  "profile_id": "9front-11554-amd64-hjfs-gmt-drawterm-v1",
+  "parent": {
+    "image_id": "p9qemu-9front-11554-amd64-hjfs-gmt-002",
+    "manifest_url": "https://github.com/dharmatech/p9qemu/releases/download/ready-9front-11554-amd64-hjfs-gmt-002/image.json",
+    "manifest_sha256": "cfee07ec6fcf82d15ce77b43d8633f696e92118f8cff166a766ccdc9c05dfc53",
+    "image_sha256": "1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8"
+  },
+  "guest": {
+    "user": "glenda",
+    "system_name": "cirno",
+    "root_partition": "/dev/sd00/fs"
+  },
+  "plan9_ini": {
+    "path": "/n/9fat/plan9.ini",
+    "source": {
+      "required": {
+        "bootfile": "9pc64",
+        "bootargs": "local!/dev/sd00/fs -m 147",
+        "mouseport": "ps2",
+        "monitor": "vesa",
+        "vgasize": "1024x768x16",
+        "console": "0"
+      },
+      "absent": [
+        "nobootprompt",
+        "nvram",
+        "service"
+      ]
+    },
+    "target": {
+      "required": {
+        "bootfile": "9pc64",
+        "bootargs": "local!/dev/sd00/fs -m 147",
+        "mouseport": "ps2",
+        "monitor": "vesa",
+        "vgasize": "1024x768x16",
+        "console": "0",
+        "nobootprompt": "local!/dev/sd00/fs -m 147",
+        "nvram": "#S/sd00/nvram",
+        "service": "cpu"
+      }
+    }
+  },
+  "nvram": {
+    "method": "auth-wrkey-v1",
+    "authid": "glenda",
+    "authdom": "9front",
+    "secstore_key": "",
+    "password": "p9qemu-demo",
+    "credential_class": "public-demo",
+    "legacy_p9sk1": false
+  },
+  "drawterm": {
+    "bind_address": "127.0.0.1",
+    "cpu_host_port": 17019,
+    "auth_host_port": 17567
+  }
+}
