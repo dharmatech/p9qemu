@@ -111,7 +111,7 @@ def _prepare(command: list[str], profile: DrawtermPostinstallProfile):
         raise P9QemuError(
             f"could not start Drawterm-preparation QEMU: {error}"
         ) from error
-    child.delaybeforesend = 0.05
+    child.delaybeforesend = 0.5
     try:
         return drive_drawterm_preparation(
             PexpectGuestValidationTransport(child), profile

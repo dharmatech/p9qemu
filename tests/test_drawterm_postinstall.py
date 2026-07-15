@@ -128,6 +128,7 @@ def test_driver_applies_exact_additions_and_configures_nvram() -> None:
     assert transport.lines == [
         "",
         "glenda",
+        "",
         "auth/wrkey",
         "glenda",
         "9front",

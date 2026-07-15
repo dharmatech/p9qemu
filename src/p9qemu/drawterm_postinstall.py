@@ -490,6 +490,11 @@ def drive_drawterm_preparation(
         "boot.root", re.escape(f"hjfs: fs is {profile.guest.root_partition}"), 120
     )
     transport.wait("boot.shell", SHELL_PROMPT, 120)
+    # The graphical-plus-serial image can print its first COM1 prompt just
+    # before the interactive shell is ready to consume a new line. Require a
+    # harmless prompt round trip before sending a state-changing command.
+    transport.send_line("")
+    transport.wait("boot.shell-ready", SHELL_PROMPT, 30)
     transport.command("guest.mount-9fat", "9fs 9fat", SHELL_PROMPT, 60)
 
     before_command = f"cat {profile.plan9_ini.path}"
