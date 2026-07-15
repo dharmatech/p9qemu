@@ -29,6 +29,16 @@ from p9qemu.host import (
 from p9qemu.instance import inspect_disk, prepare_disk, validate_disk_size
 from p9qemu.media import MediaSpec, inspect_media, prepare_media
 from p9qemu.qemu import build_install_command, build_start_command, render_command
+from p9qemu.ready_image import install_local_ready_image
+from p9qemu.ready_image_acquisition import (
+    acquire_ready_image_archive,
+    fetch_ready_image_manifest,
+    redact_url,
+)
+from p9qemu.ready_image_instance import (
+    create_ready_image_instance,
+    verify_ready_image_instance,
+)
 
 
 def _positive_int(value: str) -> int:
@@ -41,13 +51,16 @@ def _positive_int(value: str) -> int:
     return number
 
 
-def _add_runtime_options(parser: argparse.ArgumentParser, *, memory: int) -> None:
-    parser.add_argument(
-        "--disk",
-        type=Path,
-        default=Path(DEFAULT_DISK_NAME),
-        help=f"disk-image path (default: {DEFAULT_DISK_NAME})",
-    )
+def _add_runtime_options(
+    parser: argparse.ArgumentParser, *, memory: int, include_disk: bool = True
+) -> None:
+    if include_disk:
+        parser.add_argument(
+            "--disk",
+            type=Path,
+            default=Path(DEFAULT_DISK_NAME),
+            help=f"disk-image path (default: {DEFAULT_DISK_NAME})",
+        )
     parser.add_argument(
         "--memory",
         type=_positive_int,
@@ -107,7 +120,55 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     start = commands.add_parser("start", help="start an installed 9front instance")
-    _add_runtime_options(start, memory=DEFAULT_START_MEMORY_MIB)
+    _add_runtime_options(
+        start,
+        memory=DEFAULT_START_MEMORY_MIB,
+        include_disk=False,
+    )
+    start_source = start.add_mutually_exclusive_group()
+    start_source.add_argument(
+        "--disk",
+        type=Path,
+        default=Path(DEFAULT_DISK_NAME),
+        help=f"standalone disk-image path (default: {DEFAULT_DISK_NAME})",
+    )
+    start_source.add_argument(
+        "--instance",
+        type=Path,
+        help="verified ready-image instance directory",
+    )
+
+    image = commands.add_parser(
+        "image", help="acquire ready images and create writable instances"
+    )
+    image_commands = image.add_subparsers(dest="image_command", required=True)
+    image_create = image_commands.add_parser(
+        "create", help="create a writable instance from a ready-image manifest"
+    )
+    image_create.add_argument(
+        "manifest_url",
+        metavar="MANIFEST_URL",
+        help="HTTPS URL of the selected ready-image manifest",
+    )
+    image_create.add_argument(
+        "instance_dir",
+        type=Path,
+        metavar="INSTANCE_DIR",
+        help="new directory to create for the writable instance",
+    )
+    image_create.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "fetch and verify only the small manifest, then show the remaining actions"
+        ),
+    )
+    image_create.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="suppress routine p9qemu output",
+    )
     return parser
 
 
@@ -210,19 +271,83 @@ def _install(args: argparse.Namespace) -> int:
     )
 
 
+def _image_create(args: argparse.Namespace) -> int:
+    host = current_host()
+    executables = discover_qemu(host)
+    progress = _progress(args.quiet)
+    destination = _absolute(args.instance_dir)
+    if destination.exists():
+        raise P9QemuError(f"refusing to replace ready-image instance: {destination}")
+    if not destination.parent.is_dir():
+        raise P9QemuError(
+            f"ready-image instance parent directory does not exist: {destination.parent}"
+        )
+
+    cache = user_cache_dir(host)
+    acquired_manifest = fetch_ready_image_manifest(
+        args.manifest_url,
+        cache,
+        progress=progress,
+    )
+    manifest = acquired_manifest.manifest
+    progress(f"Ready image: {manifest.title}")
+    progress(f"Image ID: {manifest.image_id}")
+    progress(f"Manifest SHA-256: {acquired_manifest.sha256}")
+
+    if args.dry_run:
+        progress(
+            "Would download ready-image archive "
+            f"({manifest.artifact.size} bytes): {redact_url(manifest.artifact.url)}"
+        )
+        progress(f"Would verify and cache immutable image: {manifest.image.sha256}")
+        progress(f"Would create writable ready-image instance: {destination}")
+        return 0
+
+    acquired_archive = acquire_ready_image_archive(
+        manifest,
+        cache,
+        progress=progress,
+    )
+    cached = install_local_ready_image(
+        acquired_manifest.path,
+        acquired_archive.path,
+        cache,
+        progress=progress,
+    )
+    instance = create_ready_image_instance(
+        executables.image,
+        cached,
+        destination,
+        progress=progress,
+    )
+    progress(f"Ready-image instance created: {instance.root}")
+    progress(f"Writable instance disk: {instance.disk}")
+    return 0
+
+
 def _start(args: argparse.Namespace) -> int:
     host = current_host()
     executables = discover_qemu(host)
     acceleration = _select_acceleration(args.accel, host, executables.system)
     progress = _progress(args.quiet)
-    disk = _absolute(args.disk)
-    if not disk.exists():
-        raise P9QemuError(
-            f"disk image does not exist: {disk}\n"
-            "Run p9qemu install in this instance directory first."
-        )
-    if not disk.is_file():
-        raise P9QemuError(f"disk path is not a file: {disk}")
+    if args.instance is not None:
+        instance_root = _absolute(args.instance)
+        instance = verify_ready_image_instance(executables.image, instance_root)
+        disk = instance.disk
+        manifest = instance.cached.manifest
+        progress(f"Using ready-image instance: {instance.root}")
+        progress(f"Ready image: {manifest.title}")
+        progress(f"Image ID: {manifest.image_id}")
+        progress(f"Manifest SHA-256: {instance.manifest_sha256}")
+    else:
+        disk = _absolute(args.disk)
+        if not disk.exists():
+            raise P9QemuError(
+                f"disk image does not exist: {disk}\n"
+                "Run p9qemu install in this instance directory first."
+            )
+        if not disk.is_file():
+            raise P9QemuError(f"disk path is not a file: {disk}")
     progress(f"Using disk image: {disk}")
     progress(f"Acceleration: {acceleration.name}")
     command = build_start_command(
@@ -244,6 +369,8 @@ def run(argv: list[str] | None = None) -> int:
     try:
         if args.command == "install":
             return _install(args)
+        if args.command == "image" and args.image_command == "create":
+            return _image_create(args)
         if args.command == "start":
             return _start(args)
         raise P9QemuError(f"unknown command: {args.command}")

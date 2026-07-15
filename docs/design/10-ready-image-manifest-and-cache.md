@@ -260,13 +260,46 @@ the completion marker. A handled failure removes staging and any incomplete
 destination owned by that attempt. An existing destination is always refused,
 even when empty.
 
-Before a future launch, the verifier must require `instance.json`, fully
+Before every CLI launch, the verifier requires `instance.json`, fully
 reverify the referenced cached bundle, rehash its external manifest, compare
 all recorded identity and runtime fields, require a writable overlay, and
 query `qemu-img info` again. This makes cache relocation, metadata edits,
 backing-file substitution, and accidental direct-base use fail closed. This
-checkpoint creates and verifies instances only; it does not launch, rebase,
-clone, snapshot, delete, or garbage-collect them.
+workflow does not rebase, clone, snapshot, delete, or garbage-collect them.
+
+## Public CLI boundary
+
+The first public selection mechanism is an exact HTTPS manifest URL:
+
+```console
+$ p9qemu image create https://host.example/releases/image.json INSTANCE_DIR
+$ p9qemu start --instance INSTANCE_DIR
+```
+
+`image create` is a thin orchestration layer over the separately tested
+boundaries. It discovers QEMU before network access, refuses an existing
+destination before acquisition, fetches and strictly parses the manifest,
+prints its title, immutable ID, and SHA-256, resumably acquires the pinned
+archive, installs and reverifies the immutable cached base, and atomically
+creates the writable instance. The final output identifies both the instance
+root and overlay disk.
+
+`image create --dry-run` deliberately fetches and content-addresses only the
+bounded manifest. This small network operation is required to report the exact
+image ID, manifest digest, archive URL with query data redacted, compressed
+byte count, base digest, and destination. It never downloads the archive,
+extracts the bundle, creates an instance, or starts QEMU.
+
+`start --instance` and `start --disk` are mutually exclusive. The latter
+preserves the existing standalone-disk workflow and remains the default when
+neither option is written. The former performs the complete instance verifier
+before acceleration selection is used to construct and print the ordinary
+QEMU start command. The base is never supplied to QEMU as a writable disk.
+
+No moving alias, built-in catalog, variant flag, one-shot `run` command, or
+automatic cache relocation is part of this contract. Those conveniences can
+be added later while exact manifest URLs remain a stable, transparent escape
+hatch.
 
 ### Real overlay acceptance (2026-07-15)
 
@@ -335,13 +368,12 @@ publication occurred.
 
 The next useful increments are intentionally separable:
 
-1. expose acquisition, installation, instance creation, verification, and
-   launch through a final CLI vocabulary;
-2. perform an explicitly approved live-download acceptance test;
-3. perform an explicitly approved QEMU boot through a durable overlay; and
-4. only then define the reviewed GitHub publication procedure and catalog.
+1. perform an explicitly approved live-download acceptance test through the
+   public CLI;
+2. perform an explicitly approved QEMU boot through a durable overlay; and
+3. only then define the reviewed GitHub publication procedure and catalog.
 
-The selection design remains open. A future command may accept a manifest URL,
-an exact catalog ID, or both. Moving aliases must resolve visibly to an exact
-immutable manifest before acquisition, and existing instances must never be
-silently rebased.
+Additional selection conveniences remain open. The current command accepts an
+exact manifest URL; a future command may also accept an exact catalog ID.
+Moving aliases must resolve visibly to an exact immutable manifest before
+acquisition, and existing instances must never be silently rebased.

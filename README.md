@@ -95,6 +95,58 @@ and decompressed checksums, and distribution details are recorded in the
 [`9front-11554-amd64` media manifest](media/9front-11554-amd64/media-manifest.json).
 An overridden URL without `--iso-sha256` produces a warning.
 
+## Create an instance from a ready image
+
+A published ready image is selected by its small `image.json` manifest rather
+than by linking directly to its large archive. Given a manifest URL, create a
+new writable instance directory with:
+
+```console
+$ p9qemu image create https://host.example/releases/image.json my-ready-9front
+```
+
+The URL above is illustrative; use the exact manifest URL printed on the page
+for the selected image. The parent directory must already exist, and
+`my-ready-9front` must not exist. P9QEMU refuses to replace even an empty
+destination directory.
+
+The command identifies the selected image and manifest digest, resumably
+downloads and verifies the compressed archive, installs its standalone QCOW2
+base into the content-addressed per-user cache, and creates:
+
+```text
+my-ready-9front/
+  disk.qcow2
+  instance.json
+```
+
+`disk.qcow2` is a small writable overlay, not a second copy of the complete
+release image. Its immutable backing image remains in the cache and may be
+shared by many instances. Consequently, moving or deleting that cache breaks
+the instance; P9QEMU detects this instead of silently selecting another base.
+
+To identify the manifest and planned artifact without downloading the large
+archive or creating the instance, add `--dry-run`:
+
+```console
+$ p9qemu image create https://host.example/releases/image.json my-ready-9front --dry-run
+```
+
+Unlike installer dry-run, this performs one bounded network operation: it
+fetches, verifies, and content-addresses the selected manifest, which is
+limited to 64 KiB. It does not download the image archive, extract the bundle,
+create an overlay, or launch QEMU.
+
+Start the resulting instance explicitly:
+
+```console
+$ p9qemu start --instance my-ready-9front
+```
+
+Before every launch, P9QEMU reverifies the saved manifest identity, immutable
+cached bundle, standalone base, and overlay backing relationship. It then
+prints the same complete QEMU command used for a manually installed disk.
+
 ## Start an installed VM
 
 After installation, return to the same instance directory and run:
@@ -142,7 +194,9 @@ the Agent9 comparison, is recorded in
 
 Use `p9qemu start --dry-run` to display the resolved command without launching
 the VM. QEMU inherits the terminal normally; `p9qemu` never executes commands
-through a shell.
+through a shell. `--disk` and `--instance` are mutually exclusive: `--disk`
+retains the existing standalone-disk workflow, while `--instance` selects the
+verified overlay layout created by `p9qemu image create`.
 
 ## Development
 
