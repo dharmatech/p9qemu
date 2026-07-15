@@ -2,12 +2,12 @@
 
 ## Status
 
-Implemented as a local-only foundation. Schema 1 can describe a deterministic
+Implemented as an internal foundation. Schema 1 can describe a deterministic
 release-candidate archive, the internal generator can derive that manifest by
-streaming the archive, and `p9qemu` can verify a local archive and install its
-QCOW2 into a content-addressed, read-only cache. This phase deliberately does
-not add network acquisition, a public catalog, a public CLI command, instance
-overlays, or GitHub publication.
+streaming the archive, `p9qemu` can acquire it through bounded resumable HTTPS,
+and the local installer can verify the archive and place its QCOW2 in a
+content-addressed, read-only cache. This phase deliberately does not add a
+public catalog, a public CLI command, instance overlays, or GitHub publication.
 
 The checked-in [candidate-002 example](../../images/manifests/p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json)
 uses the exact measurements and digests from the validated local bundle. Its
@@ -135,6 +135,62 @@ the selected `image.json`; it is not author authentication by itself. A public
 catalog, signed release metadata, or an attestation can provide a stronger
 origin story later without changing the archive verification chain.
 
+## HTTPS acquisition boundary
+
+Network acquisition is a separate layer from extraction and QEMU execution.
+The internal API accepts one selected manifest URL, fetches at most 64 KiB,
+parses it with the same strict schema-1 parser as a local file, and saves the
+exact bytes under their SHA-256:
+
+```text
+<cache>/manifests/<manifest-sha256>/image.json
+```
+
+The selected manifest is the metadata trust root for the request. Its declared
+archive size and SHA-256 control a second content-addressed area:
+
+```text
+<cache>/downloads/<archive-sha256>/
+  <archive-filename>
+  <archive-filename>.part
+  <archive-filename>.part.json
+  .acquire.lock/
+```
+
+Only HTTPS is accepted. Redirects are limited to eight, may not downgrade to
+HTTP or introduce credentials, and retain normal Python certificate
+verification. Because GitHub's final signed asset URL can use an opaque path,
+the declared stable URL—not a transient redirect—is required to end in the
+manifest filename. Redirect query parameters are never printed or saved.
+Requests use `Accept-Encoding: identity` so byte offsets and the compressed
+archive digest describe the same representation.
+
+A partial archive can cross process invocations only when the server supplies
+a strong ETag or, as a fallback, Last-Modified. Resume sends both `Range` and
+`If-Range`, then requires HTTP 206, the same validator, and an exact
+`Content-Range` covering the entire declared remainder. A weak ETag alone is
+not sufficient. If the server returns a complete HTTP 200 response, changes
+the validator, or supplies contradictory range metadata, the client discards
+the old prefix before one safe restart. It never blindly appends bytes.
+
+Transient network and HTTP failures preserve a validator-bound partial for a
+later invocation. A response without a usable validator can still complete in
+one run, but an interruption discards its non-resumable prefix. Oversized data,
+contradictory local metadata, and checksum failure remove the invalid partial.
+The final filename is published only after its exact byte size and SHA-256
+match the manifest. Existing completed downloads are rehashed before reuse.
+
+One digest-scoped lock directory prevents concurrent writers. A clean exit
+removes it; a lock left by a crashed process fails visibly rather than being
+silently stolen. Automated retries are deliberately absent. One invocation
+can perform at most the requested transfer plus one integrity-driven fresh
+restart, and the user can rerun the operation to resume after a normal failure.
+
+The transport is injected behind a small response interface. The test suite
+models redirects, interruptions, range responses, changed objects, corruption,
+and writer contention entirely in memory. This checkpoint performs no live
+network acceptance test and exposes no packaged command-line entry point.
+
 ## Immutable cache boundary
 
 Verified bases use the uncompressed image digest as their content address:
@@ -194,9 +250,10 @@ publication occurred.
 
 The next useful increments are intentionally separable:
 
-1. add resumable HTTPS acquisition of a selected manifest and its archive;
-2. create a writable per-instance overlay over the cached base;
-3. expose the workflow through a final CLI vocabulary; and
+1. create a writable per-instance overlay over the cached base;
+2. expose acquisition, installation, and instance creation through a final CLI
+   vocabulary;
+3. perform an explicitly approved live-download acceptance test; and
 4. only then define the reviewed GitHub publication procedure and catalog.
 
 The selection design remains open. A future command may accept a manifest URL,

@@ -368,23 +368,34 @@ def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
+def parse_ready_image_manifest_bytes(
+    content: bytes, *, source: str
+) -> ReadyImageManifest:
+    """Strictly parse bounded UTF-8 manifest bytes from one named source."""
+
+    if len(content) > MAX_MANIFEST_BYTES:
+        raise P9QemuError(
+            f"image manifest exceeds the supported size limit: {source}"
+        )
+    try:
+        document = json.loads(
+            content.decode("utf-8"), object_pairs_hook=_unique_json_object
+        )
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise P9QemuError(f"could not parse image manifest {source}: {error}") from error
+    if not isinstance(document, dict):
+        raise P9QemuError(f"image manifest must contain a JSON object: {source}")
+    return parse_ready_image_manifest(document)
+
+
 def _load_ready_image_manifest(
     path: Path,
 ) -> tuple[ReadyImageManifest, bytes]:
     try:
         content = path.read_bytes()
-        if len(content) > MAX_MANIFEST_BYTES:
-            raise P9QemuError(
-                f"image manifest exceeds the supported size limit: {path}"
-            )
-        document = json.loads(
-            content.decode("utf-8"), object_pairs_hook=_unique_json_object
-        )
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+    except OSError as error:
         raise P9QemuError(f"could not read image manifest {path}: {error}") from error
-    if not isinstance(document, dict):
-        raise P9QemuError(f"image manifest must contain a JSON object: {path}")
-    return parse_ready_image_manifest(document), content
+    return parse_ready_image_manifest_bytes(content, source=str(path)), content
 
 
 def load_ready_image_manifest(path: Path) -> ReadyImageManifest:
