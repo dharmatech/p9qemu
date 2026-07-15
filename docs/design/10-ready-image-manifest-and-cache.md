@@ -429,8 +429,50 @@ boot, and integrity checks, Windows reported 172461211648 free bytes and the
 VHDX remained exactly 219465908224 bytes. The retained isolated Linux cache
 and instance occupy 810403180 logical bytes at
 `~/vm/p9qemu-ready-11554-candidate-002-acceptance`. The two exact Windows
-temporary staging directories were verified and removed; the Linux tree is
-retained until the Windows public-CLI gate and cleanup decision are complete.
+temporary staging directories were verified and removed. At that point, the
+Linux tree remained retained pending the Windows public-CLI gate and cleanup
+decision.
+
+### Public Windows end-user acceptance (2026-07-15)
+
+The native-Windows gate was performed from an initially empty
+`C:\Users\dharm\vm\p9qemu-ready-user-test` directory using the public CLI
+installed directly from commit
+`fc98dc0a42ba09bdf96ca134c2c68b192c65beaa`. The default Windows cache did not
+already contain candidate 002. Before the run, Windows reported 172462284800
+free bytes (160.62 GiB), and the Ubuntu VHDX was exactly 219465908224 bytes
+(204.39 GiB).
+
+The end-user workflow first ran `p9qemu image create --dry-run` against the
+public `image.json`. It fetched and verified only the bounded manifest, printed
+the exact archive and image details, and created no instance. The real command
+then downloaded the 250529927-byte public archive, verified its SHA-256 as
+`ddf9086ab7925e891ea6d577474f70a6eccd91dccc85d5fc29b0d3acf29b6c4d`,
+verified and cached the standalone base under its content digest, and created
+`instance-tcg` as a 197120-byte writable overlay.
+
+`p9qemu start --instance instance-tcg --dry-run` selected TCG software
+emulation and rendered the expected overlay-only QEMU command. The real start
+reached Rio, guest networking passed with a ping to `google.com`, and `fshalt`
+closed QEMU normally. The halted overlay occupied 786432 bytes.
+
+A second `p9qemu image create` used the already verified archive and cached
+base without another download or extraction and created an independent
+`instance-whpx`. Its dry run rendered the conservative Windows acceleration
+profile `-accel whpx,kernel-irqchip=off -display sdl` with no fallback. The
+real WHPX start reported an operational Windows Hypervisor Platform
+accelerator, completed the prescribed guest checks successfully, and shut
+down normally through `fshalt`. Its halted overlay occupied 655360 bytes.
+
+Postboot, the immutable base and both overlays passed `qemu-img check`. Both
+overlays were clean, presented 32212254720 virtual bytes, retained QCOW2 backing
+format, and resolved to the exact same cached base. The base SHA-256 remained
+`1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8`.
+No QEMU process, forwarded-port listener, `.part` file, or acquisition lock
+remained. Windows reported 171638120448 free bytes (159.85 GiB), while the WSL
+VHDX remained exactly 219465908224 bytes. The verified cache and the two small
+Windows instances are retained until the acceptance evidence and cleanup
+decision are complete.
 
 ### Streaming-generator acceptance (2026-07-15)
 
@@ -452,12 +494,10 @@ publication occurred.
 
 The next useful increments are intentionally separable:
 
-1. repeat isolated public-URL acquisition, instance creation, and a graphical
-   boot on native Windows;
-2. record the user-facing image page with P9QEMU and direct-QEMU commands;
-3. decide whether candidate 002 is promoted beyond prerelease status or
+1. record the user-facing image page with P9QEMU and direct-QEMU commands;
+2. decide whether candidate 002 is promoted beyond prerelease status or
    remains a permanently identified reference candidate; and
-4. clean up the retained disposable acceptance instances after their evidence
+3. clean up the retained disposable acceptance instances after their evidence
    is no longer needed.
 
 Additional selection conveniences remain open. The current command accepts an
