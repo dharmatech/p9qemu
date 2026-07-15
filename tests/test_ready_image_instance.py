@@ -35,12 +35,14 @@ class FakeQemuImg:
         *,
         create_status: int = 0,
         reported_backing: Path | None = None,
+        base_backing: Path | None = None,
         mutate_base: bool = False,
     ) -> None:
         self.backing = backing.resolve()
         self.virtual_size = virtual_size
         self.create_status = create_status
         self.reported_backing = (reported_backing or backing).resolve()
+        self.base_backing = base_backing.resolve() if base_backing else None
         self.mutate_base = mutate_base
         self.commands: list[list[str]] = []
 
@@ -53,14 +55,29 @@ class FakeQemuImg:
                 self.backing.write_bytes(b"mutated base")
             return SimpleNamespace(returncode=self.create_status, stdout="", stderr="")
         assert command[1:3] == ["info", "--output=json"]
-        information = {
+        target = Path(command[-1]).resolve()
+        information: dict[str, object] = {
             "format": "qcow2",
             "virtual-size": self.virtual_size,
-            "backing-filename": str(self.reported_backing),
-            "full-backing-filename": str(self.reported_backing),
-            "backing-filename-format": "qcow2",
             "dirty-flag": False,
         }
+        if target == self.backing:
+            if self.base_backing is not None:
+                information.update(
+                    {
+                        "backing-filename": str(self.base_backing),
+                        "full-backing-filename": str(self.base_backing),
+                        "backing-filename-format": "qcow2",
+                    }
+                )
+        else:
+            information.update(
+                {
+                    "backing-filename": str(self.reported_backing),
+                    "full-backing-filename": str(self.reported_backing),
+                    "backing-filename-format": "qcow2",
+                }
+            )
         return SimpleNamespace(
             returncode=0,
             stdout=json.dumps(information),
@@ -134,7 +151,13 @@ def test_instance_is_staged_verified_and_published_with_metadata_last(
         INSTANCE_DISK_NAME,
         INSTANCE_METADATA_NAME,
     }
-    create_command = runner.commands[0]
+    assert runner.commands[0] == [
+        "qemu-img",
+        "info",
+        "--output=json",
+        str(cached.image.resolve()),
+    ]
+    create_command = runner.commands[1]
     assert create_command[:-1] == [
         "qemu-img",
         "create",
@@ -147,7 +170,7 @@ def test_instance_is_staged_verified_and_published_with_metadata_last(
     ]
     assert Path(create_command[-1]).name == INSTANCE_DISK_NAME
     assert Path(create_command[-1]).parent.name.startswith(".instance.p9qemu-")
-    assert runner.commands[1][1:3] == ["info", "--output=json"]
+    assert runner.commands[2][1:3] == ["info", "--output=json"]
     metadata = json.loads(created.metadata.read_text(encoding="utf-8"))
     assert metadata["kind"] == "p9qemu-ready-image-instance"
     assert metadata["base"]["cache_entry"] == str(cached.entry.resolve())
@@ -159,6 +182,7 @@ def test_instance_is_staged_verified_and_published_with_metadata_last(
     ).hexdigest()
     assert not list(tmp_path.glob(".instance.p9qemu-*.part"))
     assert messages == [
+        f"Verified standalone ready-image base: {cached.image.resolve()}",
         f"Creating writable ready-image instance: {destination}",
         f"Verified writable overlay backing file: {cached.image.resolve()}",
     ]
@@ -186,7 +210,8 @@ def test_instance_verification_rechecks_metadata_base_and_overlay(
 
     assert verified == created
     assert verify_runner.commands == [
-        ["qemu-img", "info", "--output=json", str(created.disk)]
+        ["qemu-img", "info", "--output=json", str(cached.image)],
+        ["qemu-img", "info", "--output=json", str(created.disk)],
     ]
 
 
@@ -255,6 +280,36 @@ def test_wrong_backing_file_is_rejected_before_publication(
             runner=runner,
         )
 
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".instance.p9qemu-*.part"))
+
+
+def test_release_base_with_its_own_backing_file_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cached = _cached_fixture(tmp_path)
+    _allow_synthetic_cache(monkeypatch, cached)
+    parent = tmp_path / "unexpected-parent.qcow2"
+    parent.write_bytes(b"parent")
+    destination = tmp_path / "instance"
+    runner = FakeQemuImg(
+        cached.image,
+        cached.manifest.image.virtual_size,
+        base_backing=parent,
+    )
+
+    with pytest.raises(P9QemuError, match="base is not standalone"):
+        create_ready_image_instance(
+            "qemu-img",
+            cached,
+            destination,
+            progress=lambda _message: None,
+            runner=runner,
+        )
+
+    assert runner.commands == [
+        ["qemu-img", "info", "--output=json", str(cached.image.resolve())]
+    ]
     assert not destination.exists()
     assert not list(tmp_path.glob(".instance.p9qemu-*.part"))
 

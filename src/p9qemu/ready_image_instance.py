@@ -216,6 +216,28 @@ def _verify_overlay_info(
         raise P9QemuError("instance overlay has a dirty QCOW2 flag")
 
 
+def _verify_standalone_base_info(
+    information: Mapping[str, object], *, virtual_size: int
+) -> None:
+    if information.get("format") != "qcow2":
+        raise P9QemuError("ready-image base is not QCOW2")
+    reported_size = information.get("virtual-size")
+    if type(reported_size) is not int or reported_size != virtual_size:
+        raise P9QemuError("ready-image base virtual size does not match its manifest")
+    backing_fields = (
+        "backing-filename",
+        "full-backing-filename",
+        "backing-filename-format",
+    )
+    if any(information.get(field) is not None for field in backing_fields):
+        raise P9QemuError(
+            "ready-image release base is not standalone; it has a backing file"
+        )
+    dirty_flag = information.get("dirty-flag")
+    if dirty_flag is not None and dirty_flag is not False:
+        raise P9QemuError("ready-image base has a dirty QCOW2 flag")
+
+
 def _metadata_document(
     cached: CachedReadyImage, manifest_sha256: str
 ) -> dict[str, object]:
@@ -288,6 +310,12 @@ def create_ready_image_instance(
     base = verified.image.resolve()
     manifest_path = verified.entry / "image.json"
     manifest_sha256 = sha256_file(manifest_path)
+    base_information = qemu_img_info(qemu_img, base, runner=runner)
+    _verify_standalone_base_info(
+        base_information,
+        virtual_size=verified.manifest.image.virtual_size,
+    )
+    progress(f"Verified standalone ready-image base: {base}")
     staging = destination.with_name(
         f".{destination.name}.p9qemu-{uuid4().hex}.part"
     )
@@ -377,6 +405,11 @@ def verify_ready_image_instance(
         raise P9QemuError("instance metadata does not match its cached ready image")
     if not _same_path(cached.image, record.backing_path):
         raise P9QemuError("instance metadata backing path does not match its cache entry")
+    base_information = qemu_img_info(qemu_img, cached.image, runner=runner)
+    _verify_standalone_base_info(
+        base_information,
+        virtual_size=record.virtual_size,
+    )
     information = qemu_img_info(qemu_img, disk, runner=runner)
     _verify_overlay_info(
         information,

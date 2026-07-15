@@ -212,7 +212,11 @@ only on directory presence: the saved external manifest, complete internal
 bundle inventory, image digest, and read-only state are checked again.
 
 The base QCOW2 is marked read-only. It must never be launched as a writable
-instance disk.
+instance disk. A distributable base must also be genuinely standalone:
+`qemu-img info --output=json` must identify QCOW2 with the manifest's virtual
+size and must report no backing filename, resolved backing filename, or backing
+format. Instance creation and pre-launch verification both enforce this rule;
+an overlay or other dependent QCOW2 can never masquerade as a release base.
 
 ## Writable instance boundary
 
@@ -242,11 +246,12 @@ never silently select a different base.
 - the immutable image ID and uncompressed base SHA-256; and
 - the runtime profile and capability list.
 
-Creation first fully reverifies the cached release bundle and read-only base.
-It builds the overlay in a unique sibling staging directory, runs `qemu-img
-info --output=json`, and requires the expected format, virtual size, absolute
-backing file, backing format when reported, and a clean dirty flag. It hashes
-the base again after overlay creation and rejects any change.
+Creation first fully reverifies the cached release bundle and read-only base,
+then confirms through `qemu-img info --output=json` that the base is standalone.
+It builds the overlay in a unique sibling staging directory, queries the new
+overlay, and requires the expected format, virtual size, absolute backing file,
+backing format when reported, and a clean dirty flag. It hashes the base again
+after overlay creation and rejects any change.
 
 Only a verified staged overlay and strictly round-tripped metadata may be
 published. The destination directory is created exclusively, the overlay is
@@ -262,6 +267,39 @@ query `qemu-img info` again. This makes cache relocation, metadata edits,
 backing-file substitution, and accidental direct-base use fail closed. This
 checkpoint creates and verifies instances only; it does not launch, rebase,
 clone, snapshot, delete, or garbage-collect them.
+
+### Real overlay acceptance (2026-07-15)
+
+The complete internal workflow was exercised on native Windows against the
+retained candidate-002 archive in Ubuntu WSL. Before the run, Windows had
+172429225984 free bytes (160.59 GiB), Ubuntu's VHDX was exactly 219465908224
+bytes (204.39 GiB), and the candidate archive was the expected 250529927 bytes.
+The dedicated Windows temporary target did not exist.
+
+Using `qemu-img version 10.2.0 (v10.2.0-12105-g0f12d445bd)`, the acceptance
+run:
+
+1. verified and extracted the exact candidate archive into a temporary cache;
+2. fully reverified the cached bundle and read-only base;
+3. confirmed that the base was QCOW2, had a 32212254720-byte virtual size, had
+   a clean dirty flag, and reported no backing relationship;
+4. created and atomically published one instance plus `instance.json`;
+5. verified the instance again through the pre-launch verifier; and
+6. rehashed the immutable base after every operation.
+
+The external manifest SHA-256 recorded in the instance was
+`3dba633bdc3685c3f3eddcafcb42fba3bb470164e6f7449ff5b5258817d319a5`.
+The base SHA-256 before and after was identically
+`1ef80c81a3f2dd09d2f173ff7dfa93d07ecee2ba453fc0f0964190adb6ee44a8`.
+The new overlay occupied 197120 bytes while presenting the full 32212254720
+virtual bytes. QEMU reported QCOW2, a clean dirty flag, backing format QCOW2,
+and matching stored and fully resolved absolute paths to the verified base.
+
+The disposable acceptance tree contained 559268646 logical bytes (533.36 MiB)
+and was removed after evidence collection. Its path no longer existed,
+Windows again reported 160.59 GiB free, and Ubuntu's VHDX remained exactly
+219465908224 bytes. No network request, QEMU system process, Plan 9 boot, guest
+command, source-image write, rebase, or publication occurred.
 
 ## Candidate 002 measurements
 
@@ -297,10 +335,10 @@ publication occurred.
 
 The next useful increments are intentionally separable:
 
-1. perform an explicitly approved real `qemu-img` overlay acceptance test;
-2. expose acquisition, installation, instance creation, verification, and
+1. expose acquisition, installation, instance creation, verification, and
    launch through a final CLI vocabulary;
-3. perform an explicitly approved live-download acceptance test; and
+2. perform an explicitly approved live-download acceptance test;
+3. perform an explicitly approved QEMU boot through a durable overlay; and
 4. only then define the reviewed GitHub publication procedure and catalog.
 
 The selection design remains open. A future command may accept a manifest URL,
