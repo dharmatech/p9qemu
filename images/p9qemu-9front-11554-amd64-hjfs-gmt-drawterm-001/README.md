@@ -26,18 +26,23 @@ interactive `auth/wrkey` answers. Tests bind the document's important values
 to the machine-readable profile so that the two representations cannot drift
 silently.
 
-## Planned acceptance gate
+## Acceptance gates
 
-Before publication, the exact derivative must pass all of the following:
+The exact derivative has passed the core cold-boot and Drawterm gate:
 
-1. a cold boot without a `bootargs` or user prompt;
-2. retained serial boot messages and diagnostics;
-3. loopback-only CPU and auth listeners through the documented host ports;
-4. a real Drawterm login using the documented demonstration credential;
-5. the expected `glenda`, `cirno`, GMT, HJFS, and networking state;
-6. clean `fshalt`, `qemu-img check`, and immutable-parent digest checks; and
-7. a disposable password-change test proving the old demonstration password
-   no longer authenticates.
+- [x] cold boot without a `bootargs` or user prompt;
+- [x] retained serial boot messages and diagnostics;
+- [x] loopback-only CPU and auth listeners through the documented host ports;
+- [x] real Drawterm authentication using the demonstration credential;
+- [x] the expected `glenda`, `cirno`, GMT, HJFS, `plan9.ini`, and networking
+  state; and
+- [x] clean `fshalt`, QEMU exit, `qemu-img check`, listener teardown, and an
+  unchanged derivative digest.
+
+One separate security-mutation gate remains before publication:
+
+- [ ] use a disposable overlay to change the password and prove the old
+  demonstration password no longer authenticates.
 
 ## Local preparation checkpoint (2026-07-15)
 
@@ -60,7 +65,44 @@ password did not appear in the serial transcript. The failed development
 attempts that exposed shell-readiness and serial-line-length constraints were
 discarded before this fresh, source-bound build.
 
-This digest identifies a preparation result, not a release candidate. It must
-still pass unattended cold boot, actual host-side Drawterm authentication,
-guest-state and networking checks, clean shutdown, and the disposable
-password-change test before packaging or publication.
+This digest identifies a prepared and core-validated derivative, not yet a
+published release candidate. The disposable password-change test still has to
+pass before packaging or publication.
+
+## Local cold-boot and Drawterm checkpoint (2026-07-15)
+
+Source commit
+`f9d9f9901a550d7b56274913b0773ef5ac81e596` validated the exact derivative
+SHA-256
+`7ff689b7b614f6884bf0a1ac525fca10b750934d99640e744823f450d28ff6b8`
+on Ubuntu 22.04 with KVM and QEMU 6.2.0. The host Drawterm executable came
+from source commit `8a88fb5b8c75450d2e20ae1c7839d823bb1f6fad` and had SHA-256
+`f808e2eedebdf7ea19bccaeac84d4d7cdd424279912d2efeeab3ba0cefa35a78`.
+
+The run sent no serial input. It observed an unattended HJFS boot, loopback CPU
+and auth listeners, real authentication, the qualified guest identity and GMT
+timezone, a successful ping, and the exact target `plan9.ini`. The final
+Drawterm command used the
+[FQA 7.2.1](https://fqa.9front.org/fqa7.html#7.2.1) non-console recipe to bind
+`#S` over `/dev` and mount `/dev/sd00/9fat`, then ran `fshalt`. The CPU-server
+serial path reported `hjfs: ending` before QEMU exited. Both the immutable
+derivative and disposable overlay passed `qemu-img check`; the derivative
+digest remained unchanged; the overlay was removed; and neither host forward
+accepted connections afterward.
+
+All fourteen recorded checks passed, and every recorded artifact digest was
+re-verified. The cleartext demonstration password did not occur anywhere in
+the evidence bundle. The first CPU connection needed one bounded retry while
+the p9any protocol became ready; the remaining five acceptance commands
+authenticated on their first attempts.
+
+### Acceptance development findings
+
+| Observation | Resulting qualification |
+| --- | --- |
+| One long Drawterm `-c` command stopped before all markers. | Use independently authenticated guest commands shorter than 128 characters. |
+| A TCP listener could accept before p9any negotiation was ready. | Retry only the observed pre-authentication `p9any ... hung up` condition, with a fixed bound. |
+| A Drawterm CPU namespace did not initially expose `/dev/sd00/9fat`. | Follow FQA 7.2.1: `bind -b '#S' /dev`, then pass `/dev/sd00/9fat` explicitly to `9fs`. |
+| `9fs 9fat` posts `/srv/dos`, keeping the command session alive. | Inspect 9fat in the final authenticated command and immediately run `fshalt`. |
+| CPU-server shutdown reached QEMU EOF after `hjfs: ending` without serial `done halting`. | Accept either qualified shutdown transcript, always followed by QEMU exit and image checks. |
+| A bind probe saw TCP `TIME_WAIT` after QEMU exited. | Require that the ports stop accepting connections; keep the stricter bind test before launch. |

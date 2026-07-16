@@ -159,8 +159,42 @@ The absolute Windows executable path above is a development-machine example;
 end-user documentation will use the user's installed Drawterm path.
 
 After checking the user, system name, GMT timezone, HJFS root, and networking,
-run `fshalt`. Confirm that QEMU exits, the image passes `qemu-img check`, and
-the immutable parent's digest did not change.
+inspect `plan9.ini`. From a Drawterm CPU namespace, follow
+[FQA 7.2.1](https://fqa.9front.org/fqa7.html#7.2.1) and bind the local disk
+device before giving `9fs` the full partition path:
+
+```text
+bind -b '#S' /dev
+9fs 9fat /dev/sd00/9fat
+cat /n/9fat/plan9.ini
+```
+
+The automated gate performs the mount, read, and `fshalt` in one final command
+because `9fs 9fat` posts `/srv/dos` in that Drawterm namespace. Confirm that
+QEMU exits, the image passes `qemu-img check`, and the derivative digest does
+not change.
+
+The Linux acceptance tool performs all of these checks through a disposable
+overlay and stores the QEMU command, redacted Drawterm commands and output,
+serial transcript, image checks, hashes, and manifest in a new-only evidence
+directory:
+
+```sh
+uv run python tools/validate_drawterm_image.py \
+    --postinstall-profile images/p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001/postinstall.json \
+    --disk /path/to/drawterm-derivative.qcow2 \
+    --expected-disk-sha256 EXPECTED_64_CHARACTER_SHA256 \
+    --output-dir /path/to/new-validation-evidence \
+    --drawterm /path/to/drawterm \
+    --drawterm-source-commit FULL_40_CHARACTER_DRAWTERM_GIT_SHA \
+    --source-commit FULL_40_CHARACTER_P9QEMU_GIT_SHA \
+    --accel kvm \
+    --network-check required \
+    --confirm-run
+```
+
+Use `--dry-run` first. The password is supplied to Drawterm only through its
+`PASS` environment variable and is omitted from commands, logs, and manifests.
 
 ## Recovery
 
