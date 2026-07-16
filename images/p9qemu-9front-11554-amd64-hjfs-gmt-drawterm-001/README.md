@@ -257,3 +257,55 @@ The prerelease remains a candidate until the complete fresh-cache end-user
 workflow downloads the public archive, creates a writable overlay, boots the
 unattended CPU server, authenticates with graphical and command-line Drawterm,
 checks networking, and shuts down cleanly on the supported hosts.
+
+## Public Windows end-user acceptance (2026-07-15)
+
+The native-Windows gate started in an empty dedicated VM directory with
+P9QEMU 0.1.0 installed from public repository commit
+`fc98dc0a42ba09bdf96ca134c2c68b192c65beaa`. The default cache did not contain
+this Drawterm candidate.
+
+The public `p9qemu image create` workflow fetched and verified the 1472-byte
+manifest, downloaded the 250535781-byte archive, matched both published
+SHA-256 digests, verified and cached the standalone read-only QCOW2, and
+created `instance-whpx` as a writable overlay with the exact cached base as its
+QCOW2 backing file.
+
+`p9qemu start --instance instance-whpx --dry-run --accel whpx` fully reverified
+the instance and rendered the qualified Windows profile
+`-accel whpx,kernel-irqchip=off -display sdl`. The real start reached the
+unattended CPU/auth service. A graphical native-Windows Drawterm connection
+started Rio with the public demonstration credential. Inside Rio, the user was
+`glenda`, the system name was `cirno`, the working directory was
+`/usr/glenda`, the persistent timezone matched GMT, and a ping to `google.com`
+succeeded.
+
+A separate command-line Drawterm connection printed the exact marker and
+identity:
+
+```text
+P9QEMU_CLI_OK
+glenda
+cirno
+```
+
+The native Drawterm executable had SHA-256
+`746938acdef38625505389886481965d68fc2b91215eee265a46eb6502d4df0a`.
+Its adjacent source checkout was clean at commit
+`8958bdbc84f56f4a05df586e92a8d85e7ca29f07`; the executable was not rebuilt as
+part of this gate, so the acceptance record binds the binary digest rather than
+claiming a reproducible source build.
+
+Command-line `fshalt` disconnected the graphical session and closed QEMU. The
+post-halt P9QEMU verifier passed again. Both the 786432-byte overlay and the
+559022080-byte cached base passed `qemu-img check`, reported clean QCOW2 dirty
+flags, and retained the exact QCOW2 backing relationship. The base remained
+read-only and its SHA-256 remained
+`7ff689b7b614f6884bf0a1ac525fca10b750934d99640e744823f450d28ff6b8`.
+No QEMU or Drawterm process remained, and neither loopback service port was
+listening.
+
+After acceptance, Windows reported 178942939136 free bytes. The Ubuntu WSL
+VHDX remained exactly 219465908224 bytes. The verified Windows cache and small
+acceptance overlay are retained pending the Linux public end-user gate and the
+cleanup decision.
