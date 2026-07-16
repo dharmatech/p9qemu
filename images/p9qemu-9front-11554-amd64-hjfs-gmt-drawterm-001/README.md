@@ -229,3 +229,31 @@ by SHA-256.
 Publication is authorized only as a non-Latest prerelease with exactly two
 assets: `image.json` and the archive above. Neither asset may be replaced under
 the tag; a correction requires candidate 002.
+
+## Public prerelease checkpoint (2026-07-15)
+
+Candidate 001 was published as a non-Latest GitHub prerelease under the
+immutable tag
+[`ready-9front-11554-amd64-hjfs-gmt-drawterm-001`](https://github.com/dharmatech/p9qemu/releases/tag/ready-9front-11554-amd64-hjfs-gmt-drawterm-001).
+The lightweight tag points exactly to commit
+`a654cafbe670c3fd8b58255c02ed8a71acec4465`, which contains the external
+manifest and publication record.
+
+The release was constructed as a draft and verified before publication.
+GitHub's server metadata independently reported exactly two uploaded assets:
+
+| Asset | Bytes | Server SHA-256 |
+| --- | ---: | --- |
+| `image.json` | 1472 | `d04b06e49c5357cd95b8a8dd47457cd2e935b89d8e49117032b29206874aead2` |
+| `p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001.tar.gz` | 250535781 | `2760028a2b13a844d33436f2d85140f6798ee84546c8668f1ffaa3bd135cb24f` |
+
+After publication, an anonymous download reproduced the exact manifest bytes.
+The public archive endpoint returned its exact content length and byte-range
+support. An isolated native-Windows `p9qemu image create --dry-run` fetched and
+verified only the public manifest, printed the pinned archive and image
+digests, and created neither an archive nor an instance.
+
+The prerelease remains a candidate until the complete fresh-cache end-user
+workflow downloads the public archive, creates a writable overlay, boots the
+unattended CPU server, authenticates with graphical and command-line Drawterm,
+checks networking, and shuts down cleanly on the supported hosts.
