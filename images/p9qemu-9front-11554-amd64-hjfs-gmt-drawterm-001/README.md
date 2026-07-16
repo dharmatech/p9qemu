@@ -39,10 +39,14 @@ The exact derivative has passed the core cold-boot and Drawterm gate:
 - [x] clean `fshalt`, QEMU exit, `qemu-img check`, listener teardown, and an
   unchanged derivative digest.
 
-One separate security-mutation gate remains before publication:
+The separate security-mutation gate has also passed:
 
-- [ ] use a disposable overlay to change the password and prove the old
-  demonstration password no longer authenticates.
+- [x] use a disposable overlay to change the password, cold boot that overlay,
+  prove the old demonstration password no longer authenticates, and prove the
+  generated replacement password does authenticate.
+
+All automated gates are now complete. A final manual end-user acceptance run
+is still planned before packaging and publication.
 
 ## Local preparation checkpoint (2026-07-15)
 
@@ -66,8 +70,7 @@ attempts that exposed shell-readiness and serial-line-length constraints were
 discarded before this fresh, source-bound build.
 
 This digest identifies a prepared and core-validated derivative, not yet a
-published release candidate. The disposable password-change test still has to
-pass before packaging or publication.
+published release candidate.
 
 ## Local cold-boot and Drawterm checkpoint (2026-07-15)
 
@@ -106,3 +109,37 @@ authenticated on their first attempts.
 | `9fs 9fat` posts `/srv/dos`, keeping the command session alive. | Inspect 9fat in the final authenticated command and immediately run `fshalt`. |
 | CPU-server shutdown reached QEMU EOF after `hjfs: ending` without serial `done halting`. | Accept either qualified shutdown transcript, always followed by QEMU exit and image checks. |
 | A bind probe saw TCP `TIME_WAIT` after QEMU exited. | Require that the ports stop accepting connections; keep the stricter bind test before launch. |
+
+## Local password-rotation checkpoint (2026-07-15)
+
+Source commit
+`392b3c3a3d330251923d5289e2b6a9838583a90c` ran the separate
+security-mutation gate against the exact derivative SHA-256
+`7ff689b7b614f6884bf0a1ac525fca10b750934d99640e744823f450d28ff6b8`.
+The host Drawterm executable was still the source-bound binary from commit
+`8a88fb5b8c75450d2e20ae1c7839d823bb1f6fad`, with SHA-256
+`f808e2eedebdf7ea19bccaeac84d4d7cdd424279912d2efeeab3ba0cefa35a78`.
+
+The Linux-only gate generated a 24-character lowercase hexadecimal password in
+memory, authenticated with the public demonstration credential, supplied the
+fixed `auth/wrkey` answers through unrecorded Drawterm stdin, and halted. It
+then cold-booted the same disposable overlay without serial input. The old
+credential received the release-qualified authentication rejection, while the
+generated replacement credential completed an authenticated marker command.
+That positive control prevents an unavailable server or generic transport
+failure from being mistaken for successful password rejection.
+
+All eight recorded checks passed: the NVRAM write marker, mutation session
+exit, mutation shutdown, old-password rejection, new-password acceptance,
+independent verification boot, verification shutdown, and port release. The
+overlay and immutable derivative passed `qemu-img check`; the derivative
+digest remained unchanged; and the overlay was removed. All eighteen artifact
+digests were independently rechecked. Neither password appeared in the event
+log, process output, serial transcripts, commands, artifacts, or manifest.
+
+### Password-rotation development findings
+
+| Observation | Resulting qualification |
+| --- | --- |
+| Linux kept the forwarded CPU port in `TIME_WAIT` after the mutation QEMU exited. | Require both ports to stop accepting connections, then wait up to 90 seconds for strict bindability before the verification QEMU starts. |
+| This release rejects the obsolete key as `cannot read authenticator`, rather than Drawterm's alternate `password mismatch`/`wrong password` pair. | Accept only the pinned release signature and only after the generated replacement credential succeeds in the same cold boot. |

@@ -196,6 +196,39 @@ uv run python tools/validate_drawterm_image.py \
 Use `--dry-run` first. The password is supplied to Drawterm only through its
 `PASS` environment variable and is omitted from commands, logs, and manifests.
 
+## 5. Validate password replacement
+
+Before publication, run the separate Linux-only mutation gate against the
+exact core-validated derivative. It creates an overlay, generates a replacement
+password in memory, rewrites NVRAM through `auth/wrkey`, shuts down, and cold
+boots the same overlay. It then requires both an explicit rejection of the old
+password and a successful authenticated command using the replacement:
+
+```sh
+uv run python tools/validate_drawterm_password_rotation.py \
+    --postinstall-profile images/p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001/postinstall.json \
+    --disk /path/to/drawterm-derivative.qcow2 \
+    --expected-disk-sha256 EXPECTED_64_CHARACTER_SHA256 \
+    --output-dir /path/to/new-password-rotation-evidence \
+    --drawterm /path/to/drawterm \
+    --drawterm-source-commit FULL_40_CHARACTER_DRAWTERM_GIT_SHA \
+    --source-commit FULL_40_CHARACTER_P9QEMU_GIT_SHA \
+    --accel kvm \
+    --confirm-run
+```
+
+Use `--dry-run` first. The public password is supplied only through Drawterm's
+`PASS` environment variable. The generated replacement is supplied to
+`auth/wrkey` only through stdin and later to Drawterm through `PASS`. Neither
+value is placed in argv, written to evidence, or included in the manifest.
+
+The gate always removes its overlay, including after failure. On success it
+also requires two unattended boots, clean HJFS shutdown evidence, both
+loopback forwards to stop accepting connections, `qemu-img check` for the
+overlay and base, and an unchanged base digest. Because Linux may retain a
+recent forward in `TIME_WAIT`, the second boot waits for strict bindability
+after first proving that neither port still accepts connections.
+
 ## Recovery
 
 To restore an interactive `bootargs` question for troubleshooting, interrupt
