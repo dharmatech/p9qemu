@@ -39,8 +39,9 @@ def session_output(*, network: bool = True) -> str:
         "P9QEMU_HOME",
         "/usr/glenda",
         "P9QEMU_TIMEZONE_GMT",
-        "P9QEMU_PLAN9_INI",
+        "P9QEMU_INI",
         *target,
+        "P9QEMU_INI_END",
     ]
     if network:
         lines.extend(("P9QEMU_NETWORK", "0: rtt 8599 µs, avg rtt 8599 µs"))
@@ -87,7 +88,7 @@ def test_shutdown_command_reads_9fat_with_the_fqa_namespace_recipe() -> None:
     command = build_guest_shutdown_command(profile())
     assert len(command) < 128
     assert "bind -b '#S' /dev; 9fs 9fat /dev/sd00/9fat" in command
-    assert "cat /n/9fat/plan9.ini; fshalt" in command
+    assert "cat /n/9fat/plan9.ini; echo P9QEMU_INI_END; fshalt" in command
 
 
 def test_only_the_qualified_pre_auth_hangup_is_retryable() -> None:

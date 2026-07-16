@@ -20,7 +20,8 @@ _USER = "P9QEMU_USER"
 _SYSNAME = "P9QEMU_SYSNAME"
 _HOME = "P9QEMU_HOME"
 _TIMEZONE = "P9QEMU_TIMEZONE_GMT"
-_PLAN9_INI = "P9QEMU_PLAN9_INI"
+_PLAN9_INI = "P9QEMU_INI"
+_PLAN9_INI_END = "P9QEMU_INI_END"
 _NETWORK = "P9QEMU_NETWORK"
 _COMPLETE = "P9QEMU_DRAWTERM_COMPLETE"
 
@@ -80,7 +81,8 @@ def build_guest_shutdown_command(profile: DrawtermPostinstallProfile) -> str:
 
     command = (
         f"bind -b '#S' /dev; 9fs 9fat /dev/sd00/9fat; "
-        f"echo {_PLAN9_INI}; cat {profile.plan9_ini.path}; fshalt"
+        f"echo {_PLAN9_INI}; cat {profile.plan9_ini.path}; "
+        f"echo {_PLAN9_INI_END}; fshalt"
     )
     if len(command) >= 128:
         raise P9QemuError(
@@ -215,7 +217,7 @@ def validate_drawterm_session_output(
 
     require_secret_absent(profile, output, label="Drawterm session output")
     lines = _lines(output)
-    for marker in (_BEGIN, _TIMEZONE, _PLAN9_INI, _COMPLETE):
+    for marker in (_BEGIN, _TIMEZONE, _PLAN9_INI, _PLAN9_INI_END, _COMPLETE):
         if marker not in lines:
             raise P9QemuError(f"Drawterm output is missing marker {marker}")
     observed = {
@@ -233,8 +235,7 @@ def validate_drawterm_session_output(
             f"Drawterm guest identity mismatch: expected {expected}, got {observed}"
         )
 
-    plan9_ini_end = _NETWORK if network_mode == "required" else _COMPLETE
-    observed_settings = _values_between(lines, _PLAN9_INI, plan9_ini_end)
+    observed_settings = _values_between(lines, _PLAN9_INI, _PLAN9_INI_END)
     if observed_settings != profile.plan9_ini.target_values:
         raise P9QemuError(
             "Drawterm plan9.ini output does not exactly match the qualified target: "
