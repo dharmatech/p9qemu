@@ -1,8 +1,8 @@
 # 9front 11554 AMD64 HJFS GMT Drawterm image
 
-> **Prerelease candidate.** Candidate 001 is immutable and has completed fresh
-> public-download acceptance on Linux and Windows. It remains a prerelease
-> pending an explicit promotion decision.
+> **Stable ready image (revision 001).** Candidate 001 completed automated and
+> fresh public-download acceptance on Linux and Windows before promotion. Its
+> immutable tag, manifest, archive, and image bytes were not changed.
 
 This variant starts with the immutable
 [stock candidate 002](../p9qemu-9front-11554-amd64-hjfs-gmt-002/README.md),
@@ -23,7 +23,7 @@ Install P9QEMU from the public repository:
 uv tool install git+https://github.com/dharmatech/p9qemu.git
 ```
 
-Create a writable instance from the exact candidate manifest:
+Create a writable instance from the exact stable manifest:
 
 ```console
 p9qemu image create https://github.com/dharmatech/p9qemu/releases/download/ready-9front-11554-amd64-hjfs-gmt-drawterm-001/image.json my-9front-drawterm
@@ -93,9 +93,9 @@ The separate security-mutation gate has also passed:
   prove the old demonstration password no longer authenticates, and prove the
   generated replacement password does authenticate.
 
-All automated gates and fresh end-user acceptance against the public
-prerelease are complete. Candidate 001 remains a prerelease pending an explicit
-promotion decision.
+All automated gates and fresh end-user acceptance against the public release
+are complete. Candidate 001 was promoted as stable revision 001 on 2026-07-16;
+the promotion checkpoint is recorded below.
 
 ## Local preparation checkpoint (2026-07-15)
 
@@ -227,9 +227,10 @@ result. Raw boot, Drawterm, and password-mutation transcripts are deliberately
 excluded. The internal manifest binds their retained private source manifests
 by SHA-256.
 
-Publication is authorized only as a non-Latest prerelease with exactly two
-assets: `image.json` and the archive above. Neither asset may be replaced under
-the tag; a correction requires candidate 002.
+At this packaging checkpoint, initial publication was authorized only as a
+non-Latest prerelease with exactly two assets: `image.json` and the archive
+above. Promotion required the later public acceptance gates. Neither asset may
+be replaced under the tag; a correction requires candidate 002.
 
 ## Public prerelease checkpoint (2026-07-15)
 
@@ -254,9 +255,8 @@ support. An isolated native-Windows `p9qemu image create --dry-run` fetched and
 verified only the public manifest, printed the pinned archive and image
 digests, and created neither an archive nor an instance.
 
-The required fresh-cache end-user workflow has now completed on Windows and
-Linux, as recorded below. The release remains a candidate until an explicit
-promotion decision is made.
+The required fresh-cache end-user workflow subsequently completed on Windows
+and Linux, as recorded below, and supplied the evidence used for promotion.
 
 ## Public Windows end-user acceptance (2026-07-15)
 
@@ -365,4 +365,40 @@ After the Linux gate, Windows reported 175899619328 free bytes. The dedicated
 WSL acceptance tree used 773 MiB, while the writable overlay itself remained
 under 1 MiB. The Ubuntu WSL VHDX remained exactly 219465908224 bytes, unchanged
 from the Windows acceptance checkpoint. The isolated cache and acceptance
-overlay are retained pending the promotion and cleanup decisions.
+overlay are retained pending the cleanup decision.
+
+## Stable promotion checkpoint (2026-07-16)
+
+After both public end-user gates passed, the repository owner approved
+promotion of candidate 001 as stable revision 001 and accepted GitHub's
+repository-wide Latest designation. GitHub release ID `354882842` now reports
+`isDraft: false`, `isPrerelease: false`, and `isLatest: true`. The public
+release title is `9front 11554 AMD64 HJFS GMT Drawterm image (stable revision
+001)`, while the immutable tag and internal candidate identifiers remain
+unchanged for provenance.
+
+The first promotion attempt requested a stable release without the Latest
+designation. Because this was the repository's only full release, GitHub still
+reported `isLatest: true`. The release was restored to its exact prerelease
+metadata while the policy choice was resolved, then promoted again with
+explicit approval for Latest. The intermediate rollback and final promotion
+changed release metadata only.
+
+Post-promotion verification confirmed all immutable publication state:
+
+- tag `ready-9front-11554-amd64-hjfs-gmt-drawterm-001` still points to
+  `a654cafbe670c3fd8b58255c02ed8a71acec4465`;
+- asset ID `478821383`, `image.json`, remains 1472 bytes with SHA-256
+  `d04b06e49c5357cd95b8a8dd47457cd2e935b89d8e49117032b29206874aead2`;
+- asset ID `478818782`, the ready-image archive, remains 250535781 bytes with
+  SHA-256
+  `2760028a2b13a844d33436f2d85140f6798ee84546c8668f1ffaa3bd135cb24f`;
+- both asset upload timestamps and uploaded states are unchanged;
+- an anonymous manifest download reproduced the exact 1472 bytes and digest;
+  and
+- an anonymous byte-range request reported the exact 250535781-byte archive
+  length and retained range support.
+
+The tracked `RELEASE.md` is the source of the stable public release notes. No
+asset was renamed, replaced, or re-uploaded during promotion. Any correction
+to the image or manifest requires a new revision.

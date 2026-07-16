@@ -26,7 +26,7 @@ are documented in
 
 - [`p9qemu-9front-11554-amd64-hjfs-gmt-002`](p9qemu-9front-11554-amd64-hjfs-gmt-002/README.md) — concise P9QEMU quick start for the published stock
   post-install prerelease candidate.
-- [`p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001`](p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001/README.md) — immutable prerelease candidate for the unattended-boot Drawterm derivative, with automated core and password-rotation validation.
+- [`p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001`](p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001/README.md) — stable unattended-boot Drawterm ready image, with automated validation, password-rotation validation, and fresh Windows and Linux acceptance.
 
 ## Reference builds
 
@@ -38,3 +38,4 @@ are documented in
 - [`p9qemu-9front-11554-amd64-hjfs-gmt-002.json`](manifests/p9qemu-9front-11554-amd64-hjfs-gmt-002.json) — exact manifest published as `image.json` with candidate
   002.
 - [`p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json`](manifests/p9qemu-9front-11554-amd64-hjfs-gmt-002.example.json) — exact local candidate-002 metadata and the byte-for-byte acceptance target for the streaming generator, with an intentionally non-downloadable placeholder URL.
+- [`p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001.json`](manifests/p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001.json) — exact stable Drawterm manifest published as `image.json`; its internal candidate identifier is retained for immutable provenance.

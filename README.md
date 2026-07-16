@@ -101,6 +101,9 @@ An overridden URL without `--iso-sha256` produces a warning.
 A concise, tested quick start is available for the published
 [`9front 11554 AMD64 HJFS GMT stock image`](images/p9qemu-9front-11554-amd64-hjfs-gmt-002/README.md).
 
+For an unattended CPU/auth server that is ready for Drawterm, use the stable
+[`9front 11554 AMD64 HJFS GMT Drawterm image`](images/p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001/README.md).
+
 A published ready image is selected by its small `image.json` manifest rather
 than by linking directly to its large archive. Given a manifest URL, create a
 new writable instance directory with:
