@@ -8,6 +8,7 @@ from p9qemu.drawterm_validation import (
     build_drawterm_command,
     build_drawterm_environment,
     build_guest_acceptance_commands,
+    build_guest_shutdown_command,
     is_drawterm_protocol_readiness_failure,
     validate_drawterm_session_output,
     validate_unattended_boot_transcript,
@@ -78,9 +79,15 @@ def test_guest_command_can_skip_the_environmental_ping() -> None:
 
 def test_every_required_guest_command_stays_under_transport_bound() -> None:
     commands = build_guest_acceptance_commands(profile(), network_mode="required")
-    assert len(commands) == 7
+    assert len(commands) == 6
     assert all(len(command) < 128 for command in commands)
-    assert "bind -b '#S' /dev; 9fs 9fat /dev/sd00/9fat" in commands[4]
+
+
+def test_shutdown_command_reads_9fat_with_the_fqa_namespace_recipe() -> None:
+    command = build_guest_shutdown_command(profile())
+    assert len(command) < 128
+    assert "bind -b '#S' /dev; 9fs 9fat /dev/sd00/9fat" in command
+    assert "cat /n/9fat/plan9.ini; fshalt" in command
 
 
 def test_only_the_qualified_pre_auth_hangup_is_retryable() -> None:

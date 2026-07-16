@@ -15,6 +15,7 @@ from p9qemu.drawterm_validation import (
     CPU_SERVICE_GUEST_PORT,
     build_drawterm_command,
     build_guest_acceptance_commands,
+    build_guest_shutdown_command,
     require_secret_absent,
 )
 from p9qemu.errors import P9QemuError
@@ -259,7 +260,9 @@ def run(argv: list[str] | None = None) -> int:
             build_drawterm_command(drawterm, profile, command)
             for command in guest_commands
         ]
-        drawterm_shutdown_command = build_drawterm_command(drawterm, profile, "fshalt")
+        drawterm_shutdown_command = build_drawterm_command(
+            drawterm, profile, build_guest_shutdown_command(profile)
+        )
         rendered_drawterm_commands = [
             shlex.join(command) for command in drawterm_commands
         ]

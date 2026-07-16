@@ -20,6 +20,7 @@ from p9qemu.drawterm_validation import (
     build_drawterm_command,
     build_drawterm_environment,
     build_guest_acceptance_commands,
+    build_guest_shutdown_command,
     is_drawterm_protocol_readiness_failure,
     require_secret_absent,
     validate_drawterm_session_output,
@@ -254,7 +255,9 @@ def run_pexpect_drawterm_validation(
         build_drawterm_command(drawterm_executable, profile, command)
         for command in guest_commands
     ]
-    shutdown_command = build_drawterm_command(drawterm_executable, profile, "fshalt")
+    shutdown_command = build_drawterm_command(
+        drawterm_executable, profile, build_guest_shutdown_command(profile)
+    )
     for index, command in enumerate(session_commands, start=1):
         require_secret_absent(
             profile, "\n".join(command), label=f"Drawterm session {index} argv"
@@ -308,10 +311,19 @@ def run_pexpect_drawterm_validation(
                     "was not yet accepted; retrying."
                 )
                 time.sleep(1)
+        shutdown = _run_drawterm(shutdown_command, profile, timeout_seconds=60)
+        _wait_for_shutdown(child)
+        progress("Guest completed fshalt and QEMU exited.")
         combined_session = "\n".join(
-            output
-            for session in sessions
-            for output in (session.stdout, session.stderr)
+            [
+                *(
+                    output
+                    for session in sessions
+                    for output in (session.stdout, session.stderr)
+                ),
+                shutdown.stdout,
+                shutdown.stderr,
+            ]
         )
         session_checks = validate_drawterm_session_output(
             combined_session,
@@ -319,10 +331,6 @@ def run_pexpect_drawterm_validation(
             network_mode=network_mode,
         )
         progress("Authenticated with Drawterm and verified guest state.")
-
-        shutdown = _run_drawterm(shutdown_command, profile, timeout_seconds=60)
-        _wait_for_shutdown(child)
-        progress("Guest completed fshalt and QEMU exited.")
         transcript = _read_console_log(console_log)
         boot_checks = validate_unattended_boot_transcript(transcript, profile)
         _wait_for_drawterm_ports_released(profile, progress=progress)

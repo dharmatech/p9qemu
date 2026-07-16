@@ -63,10 +63,6 @@ def build_guest_acceptance_commands(
         f"echo {_SYSNAME}; cat /dev/sysname",
         f"echo {_HOME}; pwd",
         (f"cmp /adm/timezone/GMT /adm/timezone/local && echo {_TIMEZONE}"),
-        (
-            f"bind -b '#S' /dev; 9fs 9fat /dev/sd00/9fat; "
-            f"echo {_PLAN9_INI}; cat {profile.plan9_ini.path}"
-        ),
     ]
     if network_mode == "required":
         commands.append(f"echo {_NETWORK}; ip/ping -n 1 google.com")
@@ -77,6 +73,21 @@ def build_guest_acceptance_commands(
             "128-character transport bound"
         )
     return tuple(commands)
+
+
+def build_guest_shutdown_command(profile: DrawtermPostinstallProfile) -> str:
+    """Read 9fat through the FQA namespace recipe, then halt the VM."""
+
+    command = (
+        f"bind -b '#S' /dev; 9fs 9fat /dev/sd00/9fat; "
+        f"echo {_PLAN9_INI}; cat {profile.plan9_ini.path}; fshalt"
+    )
+    if len(command) >= 128:
+        raise P9QemuError(
+            "Drawterm guest shutdown command exceeds the qualified "
+            "128-character transport bound"
+        )
+    return command
 
 
 def is_drawterm_protocol_readiness_failure(output: str) -> bool:
