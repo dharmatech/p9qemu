@@ -633,14 +633,6 @@ def run_pexpect_drawterm_password_rotation(
                 redacted_passwords=passwords,
             )
             attempt_counts.append(attempts)
-            checks.append(
-                validate_old_password_rejection(
-                    old_probe.returncode,
-                    old_probe.stdout,
-                    old_probe.stderr,
-                    passwords=passwords,
-                )
-            )
             new_probe, attempts = _run_after_protocol_readiness(
                 commands[2],
                 profile,
@@ -651,14 +643,20 @@ def run_pexpect_drawterm_password_rotation(
                 redacted_passwords=passwords,
             )
             attempt_counts.append(attempts)
-            checks.append(
-                validate_new_password_acceptance(
-                    new_probe.returncode,
-                    new_probe.stdout,
-                    new_probe.stderr,
-                    passwords=passwords,
-                )
+            new_password_check = validate_new_password_acceptance(
+                new_probe.returncode,
+                new_probe.stdout,
+                new_probe.stderr,
+                passwords=passwords,
             )
+            old_password_check = validate_old_password_rejection(
+                old_probe.returncode,
+                old_probe.stdout,
+                old_probe.stderr,
+                passwords=passwords,
+                replacement_authenticated=True,
+            )
+            checks.extend((old_password_check, new_password_check))
             shutdown, attempts = _run_after_protocol_readiness(
                 commands[3],
                 profile,

@@ -105,6 +105,7 @@ def test_old_password_requires_explicit_drawterm_rejection() -> None:
         "?password mismatch with auth server\n",
         "drawterm: wrong password\n",
         passwords=passwords(),
+        replacement_authenticated=True,
     )
     assert check.name == "old-password-rejected"
 
@@ -116,6 +117,7 @@ def test_old_password_success_is_rejected() -> None:
             f"{OLD_PASSWORD_MARKER}\n",
             "",
             passwords=passwords(),
+            replacement_authenticated=True,
         )
 
 
@@ -126,7 +128,29 @@ def test_old_password_non_auth_failure_is_not_false_success() -> None:
             "",
             "cannot read p9any negotiation: hung up",
             passwords=passwords(),
+            replacement_authenticated=True,
         )
+
+
+def test_release_authenticator_rejection_requires_positive_control() -> None:
+    with pytest.raises(P9QemuError, match="successful replacement-password control"):
+        validate_old_password_rejection(
+            1,
+            "/drawterm: cannot read authenticator\n",
+            "",
+            passwords=passwords(),
+            replacement_authenticated=False,
+        )
+
+    check = validate_old_password_rejection(
+        1,
+        "/drawterm: cannot read authenticator\n",
+        "",
+        passwords=passwords(),
+        replacement_authenticated=True,
+    )
+    assert check.name == "old-password-rejected"
+    assert "positive control" in check.detail
 
 
 def test_new_password_requires_authenticated_marker() -> None:

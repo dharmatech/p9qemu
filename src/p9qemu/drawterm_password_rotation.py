@@ -17,6 +17,7 @@ NEW_PASSWORD_MARKER = "P9QEMU_NEW_PASSWORD_ACCEPTED"
 _ROTATION_PASSWORD = re.compile(r"^[0-9a-f]{24}$")
 _PASSWORD_MISMATCH = "password mismatch with auth server"
 _WRONG_PASSWORD = "wrong password"
+_RELEASE_AUTHENTICATOR_REJECTION = "cannot read authenticator"
 
 
 @dataclass(frozen=True)
@@ -164,26 +165,35 @@ def validate_old_password_rejection(
     stderr: str,
     *,
     passwords: tuple[str, ...],
+    replacement_authenticated: bool,
 ) -> PasswordRotationCheck:
-    """Require Drawterm's explicit wrong-password rejection signature."""
+    """Require an explicit rejection plus a successful replacement control."""
 
     combined = "\n".join((stdout, stderr))
     require_passwords_absent(passwords, combined, label="old-password probe output")
+    if not replacement_authenticated:
+        raise P9QemuError(
+            "old-password rejection requires a successful replacement-password control"
+        )
     if returncode == 0 or OLD_PASSWORD_MARKER in combined:
         raise P9QemuError("the old demonstration password still authenticates")
-    missing = [
-        marker
-        for marker in (_PASSWORD_MISMATCH, _WRONG_PASSWORD)
-        if marker not in combined
-    ]
-    if missing:
+    classic_rejection = all(
+        marker in combined for marker in (_PASSWORD_MISMATCH, _WRONG_PASSWORD)
+    )
+    release_rejection = _RELEASE_AUTHENTICATOR_REJECTION in combined
+    if not classic_rejection and not release_rejection:
         raise P9QemuError(
             "old-password probe failed without Drawterm's qualified "
-            f"authentication-rejection signature; missing={missing}"
+            "authentication-rejection signature"
         )
+    detail = (
+        "Drawterm reported password mismatch and wrong password"
+        if classic_rejection
+        else "Drawterm reported the release-qualified authenticator rejection"
+    )
     return PasswordRotationCheck(
         "old-password-rejected",
-        "Drawterm reported password mismatch and wrong password",
+        f"{detail}; the replacement credential succeeded as a positive control",
     )
 
 
