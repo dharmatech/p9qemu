@@ -38,6 +38,7 @@ class DrawtermAcceptanceResult:
     """Sanitized host-side results from a Drawterm acceptance run."""
 
     checks: tuple[DrawtermAcceptanceCheck, ...]
+    session_attempts: tuple[int, ...]
     session_stdout: str
     session_stderr: str
     shutdown_stdout: str

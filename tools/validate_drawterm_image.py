@@ -22,6 +22,7 @@ from p9qemu.host import current_host, discover_qemu, resolve_acceleration
 from p9qemu.instance import prepare_validation_overlay
 from p9qemu.media import sha256_file
 from p9qemu.pexpect_drawterm_validation import (
+    DrawtermValidationError,
     run_pexpect_drawterm_validation,
 )
 from p9qemu.provenance import (
@@ -342,6 +343,11 @@ def run(argv: list[str] | None = None) -> int:
             status = result.status
         except (OSError, P9QemuError) as error:
             error_text = str(error)
+            if isinstance(error, DrawtermValidationError):
+                if not paths.drawterm_stdout.exists():
+                    write_text_new(paths.drawterm_stdout, error.session_stdout)
+                if not paths.drawterm_stderr.exists():
+                    write_text_new(paths.drawterm_stderr, error.session_stderr)
             try:
                 disk_hash_after = sha256_file(disk)
             except P9QemuError:
@@ -418,6 +424,9 @@ def run(argv: list[str] | None = None) -> int:
                     },
                     "password_transport": "PASS environment",
                     "password_redacted": True,
+                    "session_attempts": (
+                        list(result.session_attempts) if result is not None else []
+                    ),
                 },
                 "network_check": args.network_check,
                 "checks": (

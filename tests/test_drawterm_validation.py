@@ -4,6 +4,7 @@ import pytest
 
 from p9qemu.drawterm_postinstall import load_drawterm_postinstall_profile
 from p9qemu.drawterm_validation import (
+    DrawtermAcceptanceResult,
     build_drawterm_command,
     build_drawterm_environment,
     build_guest_acceptance_commands,
@@ -140,3 +141,16 @@ def test_acceptance_evidence_must_not_contain_password() -> None:
             value,
             network_mode="required",
         )
+
+
+def test_acceptance_result_records_bounded_session_attempt_counts() -> None:
+    result = DrawtermAcceptanceResult(
+        checks=(),
+        session_attempts=(2, 1, 1, 1, 1, 1, 1),
+        session_stdout="",
+        session_stderr="",
+        shutdown_stdout="",
+        shutdown_stderr="",
+    )
+    assert result.status == "passed"
+    assert result.session_attempts[0] == 2

@@ -30,6 +30,15 @@ from p9qemu.errors import P9QemuError
 Progress = Callable[[str], None]
 
 
+class DrawtermValidationError(P9QemuError):
+    """A validation failure carrying already-redacted attempt evidence."""
+
+    def __init__(self, message: str, *, session_stdout: str, session_stderr: str):
+        super().__init__(message)
+        self.session_stdout = session_stdout
+        self.session_stderr = session_stderr
+
+
 def _ports(profile: DrawtermPostinstallProfile) -> tuple[int, int]:
     return (
         profile.drawterm.cpu_host_port,
@@ -187,6 +196,20 @@ def _run_drawterm(
     return result
 
 
+def _attempt_log(
+    attempts: list[tuple[int, int, subprocess.CompletedProcess[str]]],
+    stream: str,
+) -> str:
+    sections = []
+    for command_index, attempt, result in attempts:
+        output = getattr(result, stream)
+        sections.append(
+            f"# acceptance command {command_index} attempt {attempt} "
+            f"status {result.returncode}\n{output}"
+        )
+    return "\n".join(sections)
+
+
 def _read_console_log(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8", errors="replace")
@@ -253,19 +276,36 @@ def run_pexpect_drawterm_validation(
         ) from error
 
     sessions: list[subprocess.CompletedProcess[str]] = []
+    attempts: list[tuple[int, int, subprocess.CompletedProcess[str]]] = []
+    attempt_counts: list[int] = []
     shutdown: subprocess.CompletedProcess[str] | None = None
     try:
         _wait_for_unattended_boot(child, profile, progress=progress)
         _wait_for_drawterm_services(child, profile, progress=progress)
         for index, command in enumerate(session_commands, start=1):
-            session = _run_drawterm(command, profile, timeout_seconds=60)
-            command_output = "\n".join((session.stdout, session.stderr))
-            if session.returncode != 0:
-                raise P9QemuError(
-                    f"Drawterm acceptance command {index} exited with status "
-                    f"{session.returncode}: {command_output[-500:]!r}"
+            for attempt in range(1, 11):
+                session = _run_drawterm(command, profile, timeout_seconds=60)
+                attempts.append((index, attempt, session))
+                if session.returncode == 0:
+                    sessions.append(session)
+                    attempt_counts.append(attempt)
+                    break
+                command_output = "\n".join((session.stdout, session.stderr))
+                if attempt == 10:
+                    raise P9QemuError(
+                        f"Drawterm acceptance command {index} failed after "
+                        f"{attempt} attempts; final status {session.returncode}: "
+                        f"{command_output[-500:]!r}"
+                    )
+                if not child.isalive():
+                    raise P9QemuError(
+                        "QEMU exited during Drawterm protocol-readiness retries"
+                    )
+                progress(
+                    f"Drawterm acceptance command {index} attempt {attempt} "
+                    "was not yet accepted; retrying."
                 )
-            sessions.append(session)
+                time.sleep(1)
         combined_session = "\n".join(
             output
             for session in sessions
@@ -292,6 +332,10 @@ def run_pexpect_drawterm_validation(
             ),
             *session_checks,
             DrawtermAcceptanceCheck(
+                "drawterm-session-attempts",
+                f"bounded attempts per acceptance command: {attempt_counts}",
+            ),
+            DrawtermAcceptanceCheck(
                 "orderly-shutdown", "guest completed fshalt and QEMU exited"
             ),
             DrawtermAcceptanceCheck(
@@ -301,13 +345,22 @@ def run_pexpect_drawterm_validation(
         return (
             DrawtermAcceptanceResult(
                 checks=checks,
-                session_stdout="\n".join(session.stdout for session in sessions),
-                session_stderr="\n".join(session.stderr for session in sessions),
+                session_attempts=tuple(attempt_counts),
+                session_stdout=_attempt_log(attempts, "stdout"),
+                session_stderr=_attempt_log(attempts, "stderr"),
                 shutdown_stdout=shutdown.stdout,
                 shutdown_stderr=shutdown.stderr,
             ),
             session_commands,
             shutdown_command,
         )
+    except P9QemuError as error:
+        if attempts:
+            raise DrawtermValidationError(
+                str(error),
+                session_stdout=_attempt_log(attempts, "stdout"),
+                session_stderr=_attempt_log(attempts, "stderr"),
+            ) from error
+        raise
     finally:
         _terminate(child)
