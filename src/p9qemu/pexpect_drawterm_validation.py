@@ -19,7 +19,7 @@ from p9qemu.drawterm_validation import (
     NetworkMode,
     build_drawterm_command,
     build_drawterm_environment,
-    build_guest_acceptance_command,
+    build_guest_acceptance_commands,
     require_secret_absent,
     validate_drawterm_session_output,
     validate_unattended_boot_transcript,
@@ -215,7 +215,7 @@ def run_pexpect_drawterm_validation(
     console_log: Path,
     network_mode: NetworkMode,
     progress: Progress,
-) -> tuple[DrawtermAcceptanceResult, list[str], list[str]]:
+) -> tuple[DrawtermAcceptanceResult, list[list[str]], list[str]]:
     """Cold boot without input, authenticate via Drawterm, and halt cleanly."""
 
     if not qemu_command:
@@ -225,15 +225,17 @@ def run_pexpect_drawterm_validation(
             f"Drawterm executable is not an executable file: {drawterm_executable}"
         )
     require_drawterm_ports_available(profile)
-    guest_command = build_guest_acceptance_command(profile, network_mode=network_mode)
-    session_command = build_drawterm_command(
-        drawterm_executable, profile, guest_command
-    )
+    guest_commands = build_guest_acceptance_commands(profile, network_mode=network_mode)
+    session_commands = [
+        build_drawterm_command(drawterm_executable, profile, command)
+        for command in guest_commands
+    ]
     shutdown_command = build_drawterm_command(drawterm_executable, profile, "fshalt")
-    for label, command in (
-        ("Drawterm session argv", session_command),
-        ("Drawterm shutdown argv", shutdown_command),
-    ):
+    for index, command in enumerate(session_commands, start=1):
+        require_secret_absent(
+            profile, "\n".join(command), label=f"Drawterm session {index} argv"
+        )
+    for label, command in (("Drawterm shutdown argv", shutdown_command),):
         require_secret_absent(profile, "\n".join(command), label=label)
 
     try:
@@ -250,18 +252,25 @@ def run_pexpect_drawterm_validation(
             f"could not start unattended Drawterm validation QEMU: {error}"
         ) from error
 
-    session: subprocess.CompletedProcess[str] | None = None
+    sessions: list[subprocess.CompletedProcess[str]] = []
     shutdown: subprocess.CompletedProcess[str] | None = None
     try:
         _wait_for_unattended_boot(child, profile, progress=progress)
         _wait_for_drawterm_services(child, profile, progress=progress)
-        session = _run_drawterm(session_command, profile, timeout_seconds=120)
-        combined_session = "\n".join((session.stdout, session.stderr))
-        if session.returncode != 0:
-            raise P9QemuError(
-                f"Drawterm acceptance command exited with status "
-                f"{session.returncode}: {combined_session[-500:]!r}"
-            )
+        for index, command in enumerate(session_commands, start=1):
+            session = _run_drawterm(command, profile, timeout_seconds=60)
+            command_output = "\n".join((session.stdout, session.stderr))
+            if session.returncode != 0:
+                raise P9QemuError(
+                    f"Drawterm acceptance command {index} exited with status "
+                    f"{session.returncode}: {command_output[-500:]!r}"
+                )
+            sessions.append(session)
+        combined_session = "\n".join(
+            output
+            for session in sessions
+            for output in (session.stdout, session.stderr)
+        )
         session_checks = validate_drawterm_session_output(
             combined_session,
             profile,
@@ -292,12 +301,12 @@ def run_pexpect_drawterm_validation(
         return (
             DrawtermAcceptanceResult(
                 checks=checks,
-                session_stdout=session.stdout,
-                session_stderr=session.stderr,
+                session_stdout="\n".join(session.stdout for session in sessions),
+                session_stderr="\n".join(session.stderr for session in sessions),
                 shutdown_stdout=shutdown.stdout,
                 shutdown_stderr=shutdown.stderr,
             ),
-            session_command,
+            session_commands,
             shutdown_command,
         )
     finally:

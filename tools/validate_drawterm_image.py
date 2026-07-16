@@ -14,7 +14,7 @@ from p9qemu.drawterm_validation import (
     AUTH_SERVICE_GUEST_PORT,
     CPU_SERVICE_GUEST_PORT,
     build_drawterm_command,
-    build_guest_acceptance_command,
+    build_guest_acceptance_commands,
     require_secret_absent,
 )
 from p9qemu.errors import P9QemuError
@@ -251,12 +251,21 @@ def run(argv: list[str] | None = None) -> int:
             forwards=forwards,
         )
         rendered_qemu = render_command(qemu_command, system="Linux")
-        guest_command = build_guest_acceptance_command(
+        guest_commands = build_guest_acceptance_commands(
             profile, network_mode=args.network_check
         )
-        drawterm_command = build_drawterm_command(drawterm, profile, guest_command)
+        drawterm_commands = [
+            build_drawterm_command(drawterm, profile, command)
+            for command in guest_commands
+        ]
         drawterm_shutdown_command = build_drawterm_command(drawterm, profile, "fshalt")
-        rendered_drawterm = shlex.join(drawterm_command)
+        rendered_drawterm_commands = [
+            shlex.join(command) for command in drawterm_commands
+        ]
+        rendered_drawterm = "\n\n".join(
+            f"# acceptance command {index}\n{command}"
+            for index, command in enumerate(rendered_drawterm_commands, start=1)
+        )
         rendered_shutdown = shlex.join(drawterm_shutdown_command)
         for label, text in (
             ("QEMU command", rendered_qemu),
@@ -314,8 +323,8 @@ def run(argv: list[str] | None = None) -> int:
                     progress=recorder,
                 )
             )
-            if observed_drawterm_command != drawterm_command:
-                raise P9QemuError("executed Drawterm command differed from evidence")
+            if observed_drawterm_command != drawterm_commands:
+                raise P9QemuError("executed Drawterm commands differed from evidence")
             if observed_shutdown_command != drawterm_shutdown_command:
                 raise P9QemuError(
                     "executed Drawterm shutdown command differed from evidence"
@@ -395,10 +404,14 @@ def run(argv: list[str] | None = None) -> int:
                 "drawterm": {
                     "executable_sha256": sha256_file(drawterm),
                     "source_commit": drawterm_source_commit,
-                    "command": {
-                        "argv": drawterm_command,
-                        "rendered": rendered_drawterm,
-                    },
+                    "commands": [
+                        {"argv": command, "rendered": rendered}
+                        for command, rendered in zip(
+                            drawterm_commands,
+                            rendered_drawterm_commands,
+                            strict=True,
+                        )
+                    ],
                     "shutdown_command": {
                         "argv": drawterm_shutdown_command,
                         "rendered": rendered_shutdown,

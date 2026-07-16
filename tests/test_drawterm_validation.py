@@ -6,7 +6,7 @@ from p9qemu.drawterm_postinstall import load_drawterm_postinstall_profile
 from p9qemu.drawterm_validation import (
     build_drawterm_command,
     build_drawterm_environment,
-    build_guest_acceptance_command,
+    build_guest_acceptance_commands,
     validate_drawterm_session_output,
     validate_unattended_boot_transcript,
 )
@@ -47,7 +47,7 @@ def session_output(*, network: bool = True) -> str:
 
 def test_drawterm_argv_uses_loopback_endpoints_without_password() -> None:
     value = profile()
-    guest_command = build_guest_acceptance_command(value, network_mode="required")
+    guest_command = build_guest_acceptance_commands(value, network_mode="required")[0]
     command = build_drawterm_command(Path("/opt/drawterm"), value, guest_command)
     assert command[:8] == [
         str(Path("/opt/drawterm")),
@@ -68,9 +68,16 @@ def test_drawterm_argv_uses_loopback_endpoints_without_password() -> None:
 
 def test_guest_command_can_skip_the_environmental_ping() -> None:
     value = profile()
-    command = build_guest_acceptance_command(value, network_mode="skip")
-    assert "ip/ping" not in command
-    assert "P9QEMU_NETWORK" not in command
+    commands = build_guest_acceptance_commands(value, network_mode="skip")
+    assert all(len(command) < 128 for command in commands)
+    assert "ip/ping" not in "\n".join(commands)
+    assert "P9QEMU_NETWORK" not in "\n".join(commands)
+
+
+def test_every_required_guest_command_stays_under_transport_bound() -> None:
+    commands = build_guest_acceptance_commands(profile(), network_mode="required")
+    assert len(commands) == 7
+    assert all(len(command) < 128 for command in commands)
 
 
 def test_unattended_boot_requires_hjfs_and_init_without_prompts() -> None:

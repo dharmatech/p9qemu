@@ -48,32 +48,31 @@ class DrawtermAcceptanceResult:
         return "passed"
 
 
-def build_guest_acceptance_command(
+def build_guest_acceptance_commands(
     profile: DrawtermPostinstallProfile,
     *,
     network_mode: NetworkMode,
-) -> str:
-    """Build a bounded rc command that emits machine-readable observations."""
+) -> tuple[str, ...]:
+    """Build bounded rc commands that emit machine-readable observations."""
 
     if network_mode not in {"required", "skip"}:
         raise P9QemuError("Drawterm network mode must be either 'required' or 'skip'")
     commands = [
-        f"echo {_BEGIN}",
-        f"echo {_USER}",
-        "echo $user",
-        f"echo {_SYSNAME}",
-        "cat /dev/sysname",
-        f"echo {_HOME}",
-        "pwd",
+        f"echo {_BEGIN}; echo {_USER}; echo $user",
+        f"echo {_SYSNAME}; cat /dev/sysname",
+        f"echo {_HOME}; pwd",
         (f"cmp /adm/timezone/GMT /adm/timezone/local && echo {_TIMEZONE}"),
-        "9fs 9fat",
-        f"echo {_PLAN9_INI}",
-        f"cat {profile.plan9_ini.path}",
+        f"9fs 9fat; echo {_PLAN9_INI}; cat {profile.plan9_ini.path}",
     ]
     if network_mode == "required":
-        commands.extend((f"echo {_NETWORK}", "ip/ping -n 1 google.com"))
+        commands.append(f"echo {_NETWORK}; ip/ping -n 1 google.com")
     commands.append(f"echo {_COMPLETE}")
-    return "; ".join(commands)
+    if any(len(command) >= 128 for command in commands):
+        raise P9QemuError(
+            "Drawterm guest acceptance command exceeds the qualified "
+            "128-character transport bound"
+        )
+    return tuple(commands)
 
 
 def build_drawterm_command(
