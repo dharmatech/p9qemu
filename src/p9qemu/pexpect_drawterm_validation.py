@@ -20,6 +20,7 @@ from p9qemu.drawterm_validation import (
     build_drawterm_command,
     build_drawterm_environment,
     build_guest_acceptance_commands,
+    is_drawterm_protocol_readiness_failure,
     require_secret_absent,
     validate_drawterm_session_output,
     validate_unattended_boot_transcript,
@@ -291,10 +292,11 @@ def run_pexpect_drawterm_validation(
                     attempt_counts.append(attempt)
                     break
                 command_output = "\n".join((session.stdout, session.stderr))
-                if attempt == 10:
+                transient = is_drawterm_protocol_readiness_failure(command_output)
+                if attempt == 10 or not transient:
                     raise P9QemuError(
-                        f"Drawterm acceptance command {index} failed after "
-                        f"{attempt} attempts; final status {session.returncode}: "
+                        f"Drawterm acceptance command {index} exited with status "
+                        f"{session.returncode} on attempt {attempt}: "
                         f"{command_output[-500:]!r}"
                     )
                 if not child.isalive():

@@ -8,6 +8,7 @@ from p9qemu.drawterm_validation import (
     build_drawterm_command,
     build_drawterm_environment,
     build_guest_acceptance_commands,
+    is_drawterm_protocol_readiness_failure,
     validate_drawterm_session_output,
     validate_unattended_boot_transcript,
 )
@@ -79,6 +80,14 @@ def test_every_required_guest_command_stays_under_transport_bound() -> None:
     commands = build_guest_acceptance_commands(profile(), network_mode="required")
     assert len(commands) == 7
     assert all(len(command) < 128 for command in commands)
+    assert "bind -b '#S' /dev; 9fs 9fat /dev/sd00/9fat" in commands[4]
+
+
+def test_only_the_qualified_pre_auth_hangup_is_retryable() -> None:
+    assert is_drawterm_protocol_readiness_failure(
+        "drawterm: cannot read p9any negotiation: hung up"
+    )
+    assert not is_drawterm_protocol_readiness_failure("no 9fat partition found")
 
 
 def test_unattended_boot_requires_hjfs_and_init_without_prompts() -> None:

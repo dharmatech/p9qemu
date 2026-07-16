@@ -63,7 +63,10 @@ def build_guest_acceptance_commands(
         f"echo {_SYSNAME}; cat /dev/sysname",
         f"echo {_HOME}; pwd",
         (f"cmp /adm/timezone/GMT /adm/timezone/local && echo {_TIMEZONE}"),
-        f"9fs 9fat; echo {_PLAN9_INI}; cat {profile.plan9_ini.path}",
+        (
+            f"bind -b '#S' /dev; 9fs 9fat /dev/sd00/9fat; "
+            f"echo {_PLAN9_INI}; cat {profile.plan9_ini.path}"
+        ),
     ]
     if network_mode == "required":
         commands.append(f"echo {_NETWORK}; ip/ping -n 1 google.com")
@@ -74,6 +77,12 @@ def build_guest_acceptance_commands(
             "128-character transport bound"
         )
     return tuple(commands)
+
+
+def is_drawterm_protocol_readiness_failure(output: str) -> bool:
+    """Identify the one qualified transient seen before p9any is ready."""
+
+    return "cannot read p9any negotiation: hung up" in output
 
 
 def build_drawterm_command(
