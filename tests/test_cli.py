@@ -94,6 +94,10 @@ def test_start_dry_run_prints_runtime_forwards(
     result = cli.run(["start", "--disk", str(disk), "--dry-run", "--accel", "tcg"])
     assert result == 0
     output = capsys.readouterr().out
+    assert (
+        f"Using disk image: {disk}\n"
+        "Acceleration:     TCG software emulation\n"
+    ) in output
     assert "Would start QEMU:" in output
     assert "hostfwd=tcp:127.0.0.1:17564-:564" in output
 
@@ -154,7 +158,10 @@ def test_explicit_whpx_queries_qemu_and_prints_required_profile(
     assert result == 0
     assert queried == [executable]
     output = capsys.readouterr().out
-    assert "Acceleration: WHPX with userspace irqchip and SDL (no fallback)" in output
+    assert (
+        "Acceleration:     WHPX with userspace irqchip and SDL (no fallback)"
+        in output
+    )
     assert "    -m 2048 -accel whpx,kernel-irqchip=off -display sdl `\n" in output
     assert "-smp" not in output
 
@@ -277,9 +284,11 @@ def test_image_create_dry_run_fetches_only_manifest_and_describes_plan(
     ]
     assert not destination.exists()
     output = capsys.readouterr().out
-    assert "Ready image: Synthetic 9front ready image" in output
-    assert "Image ID: p9qemu-9front-test-stock-001" in output
-    assert f"Manifest SHA-256: {'b' * 64}" in output
+    assert (
+        "Ready image:      Synthetic 9front ready image\n"
+        "Image ID:         p9qemu-9front-test-stock-001\n"
+        f"Manifest SHA-256: {'b' * 64}\n"
+    ) in output
     assert "Would download ready-image archive (123456 bytes)" in output
     assert "private=secret" not in output
     assert f"Would verify and cache immutable image: {'a' * 64}" in output
@@ -352,8 +361,10 @@ def test_image_create_composes_acquisition_cache_and_instance_creation(
         ),
     ]
     output = capsys.readouterr().out
-    assert f"Ready-image instance created: {destination}" in output
-    assert f"Writable instance disk: {disk}" in output
+    assert (
+        f"Ready-image instance created: {destination}\n"
+        f"Writable instance disk:       {disk}\n"
+    ) in output
 
 
 def test_start_instance_reverifies_it_and_launches_its_overlay(
@@ -393,9 +404,14 @@ def test_start_instance_reverifies_it_and_launches_its_overlay(
     assert result == 0
     assert calls == [(r"C:\Program Files\qemu\qemu-img.exe", root)]
     output = capsys.readouterr().out
-    assert f"Using ready-image instance: {root}" in output
-    assert "Ready image: Synthetic 9front ready image" in output
-    assert f"Manifest SHA-256: {'b' * 64}" in output
+    assert (
+        f"Using ready-image instance: {root}\n"
+        "Ready image:                Synthetic 9front ready image\n"
+        "Image ID:                   p9qemu-9front-test-stock-001\n"
+        f"Manifest SHA-256:           {'b' * 64}\n"
+        f"Using disk image:           {disk}\n"
+        "Acceleration:               TCG software emulation\n"
+    ) in output
     assert f"file={disk},format=qcow2" in output
     assert "Would start QEMU:" in output
 

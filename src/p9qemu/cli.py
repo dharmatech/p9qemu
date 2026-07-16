@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Iterable
 from pathlib import Path
 import subprocess
 import sys
@@ -184,6 +185,18 @@ def _progress(quiet: bool):
     return write
 
 
+def _write_summary(
+    progress: Callable[[str], None],
+    fields: Iterable[tuple[str, object]],
+) -> None:
+    rows = tuple(fields)
+    if not rows:
+        return
+    label_width = max(len(label) for label, _value in rows)
+    for label, value in rows:
+        progress(f"{label + ':':<{label_width + 1}} {value}")
+
+
 def _select_acceleration(
     requested: str, host: HostInfo, executable: str
 ) -> Acceleration:
@@ -257,8 +270,7 @@ def _install(args: argparse.Namespace) -> int:
             progress=progress,
         )
 
-    if not args.quiet:
-        progress(f"Acceleration: {acceleration.name}")
+    _write_summary(progress, (("Acceleration", acceleration.name),))
     # The preflight command uses this same resolved path. Keep the explicit
     # equality check close to orchestration so future media layouts cannot
     # silently make the displayed command differ from the prepared artifact.
@@ -290,9 +302,14 @@ def _image_create(args: argparse.Namespace) -> int:
         progress=progress,
     )
     manifest = acquired_manifest.manifest
-    progress(f"Ready image: {manifest.title}")
-    progress(f"Image ID: {manifest.image_id}")
-    progress(f"Manifest SHA-256: {acquired_manifest.sha256}")
+    _write_summary(
+        progress,
+        (
+            ("Ready image", manifest.title),
+            ("Image ID", manifest.image_id),
+            ("Manifest SHA-256", acquired_manifest.sha256),
+        ),
+    )
 
     if args.dry_run:
         progress(
@@ -320,8 +337,13 @@ def _image_create(args: argparse.Namespace) -> int:
         destination,
         progress=progress,
     )
-    progress(f"Ready-image instance created: {instance.root}")
-    progress(f"Writable instance disk: {instance.disk}")
+    _write_summary(
+        progress,
+        (
+            ("Ready-image instance created", instance.root),
+            ("Writable instance disk", instance.disk),
+        ),
+    )
     return 0
 
 
@@ -330,15 +352,20 @@ def _start(args: argparse.Namespace) -> int:
     executables = discover_qemu(host)
     acceleration = _select_acceleration(args.accel, host, executables.system)
     progress = _progress(args.quiet)
+    summary: list[tuple[str, object]] = []
     if args.instance is not None:
         instance_root = _absolute(args.instance)
         instance = verify_ready_image_instance(executables.image, instance_root)
         disk = instance.disk
         manifest = instance.cached.manifest
-        progress(f"Using ready-image instance: {instance.root}")
-        progress(f"Ready image: {manifest.title}")
-        progress(f"Image ID: {manifest.image_id}")
-        progress(f"Manifest SHA-256: {instance.manifest_sha256}")
+        summary.extend(
+            (
+                ("Using ready-image instance", instance.root),
+                ("Ready image", manifest.title),
+                ("Image ID", manifest.image_id),
+                ("Manifest SHA-256", instance.manifest_sha256),
+            )
+        )
     else:
         disk = _absolute(args.disk)
         if not disk.exists():
@@ -348,8 +375,13 @@ def _start(args: argparse.Namespace) -> int:
             )
         if not disk.is_file():
             raise P9QemuError(f"disk path is not a file: {disk}")
-    progress(f"Using disk image: {disk}")
-    progress(f"Acceleration: {acceleration.name}")
+    summary.extend(
+        (
+            ("Using disk image", disk),
+            ("Acceleration", acceleration.name),
+        )
+    )
+    _write_summary(progress, summary)
     command = build_start_command(
         executables.system,
         disk=disk,
