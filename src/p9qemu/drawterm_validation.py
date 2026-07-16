@@ -122,11 +122,13 @@ def build_drawterm_command(
 def build_drawterm_environment(
     profile: DrawtermPostinstallProfile,
     environ: Mapping[str, str] | None = None,
+    *,
+    password: str | None = None,
 ) -> dict[str, str]:
     """Return a child environment with the password only in PASS."""
 
     result = dict(os.environ if environ is None else environ)
-    result["PASS"] = profile.nvram.password
+    result["PASS"] = profile.nvram.password if password is None else password
     return result
 
 

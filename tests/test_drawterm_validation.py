@@ -68,6 +68,9 @@ def test_drawterm_argv_uses_loopback_endpoints_without_password() -> None:
         "HOME": "/tmp",
         "PASS": value.nvram.password,
     }
+    assert build_drawterm_environment(
+        value, {"HOME": "/tmp"}, password="replacement"
+    ) == {"HOME": "/tmp", "PASS": "replacement"}
 
 
 def test_guest_command_can_skip_the_environmental_ping() -> None:

@@ -13,6 +13,19 @@ import time
 import pexpect
 
 from p9qemu.drawterm_postinstall import DrawtermPostinstallProfile
+from p9qemu.drawterm_password_rotation import (
+    PasswordRotationCheck,
+    PasswordRotationResult,
+    build_new_password_probe_command,
+    build_old_password_probe_command,
+    build_rotation_guest_command,
+    build_rotation_shutdown_command,
+    build_wrkey_input,
+    require_passwords_absent,
+    validate_mutation_output,
+    validate_new_password_acceptance,
+    validate_old_password_rejection,
+)
 from p9qemu.drawterm_validation import (
     DrawtermAcceptanceCheck,
     DrawtermAcceptanceResult,
@@ -47,6 +60,33 @@ class DrawtermValidationError(P9QemuError):
         super().__init__(message)
         self.session_stdout = session_stdout
         self.session_stderr = session_stderr
+        self.shutdown_stdout = shutdown_stdout
+        self.shutdown_stderr = shutdown_stderr
+
+
+class PasswordRotationValidationError(P9QemuError):
+    """A password-rotation failure carrying only scrubbed process evidence."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        mutation_stdout: str = "",
+        mutation_stderr: str = "",
+        old_password_stdout: str = "",
+        old_password_stderr: str = "",
+        new_password_stdout: str = "",
+        new_password_stderr: str = "",
+        shutdown_stdout: str = "",
+        shutdown_stderr: str = "",
+    ):
+        super().__init__(message)
+        self.mutation_stdout = mutation_stdout
+        self.mutation_stderr = mutation_stderr
+        self.old_password_stdout = old_password_stdout
+        self.old_password_stderr = old_password_stderr
+        self.new_password_stdout = new_password_stdout
+        self.new_password_stderr = new_password_stderr
         self.shutdown_stdout = shutdown_stdout
         self.shutdown_stderr = shutdown_stderr
 
@@ -188,6 +228,9 @@ def _run_drawterm(
     profile: DrawtermPostinstallProfile,
     *,
     timeout_seconds: int,
+    password: str | None = None,
+    input_text: str | None = None,
+    redacted_passwords: tuple[str, ...] = (),
 ) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
@@ -198,7 +241,8 @@ def _run_drawterm(
             errors="replace",
             check=False,
             timeout=timeout_seconds,
-            env=build_drawterm_environment(profile),
+            env=build_drawterm_environment(profile, password=password),
+            input=input_text,
         )
     except subprocess.TimeoutExpired as error:
         raise P9QemuError(
@@ -208,6 +252,8 @@ def _run_drawterm(
         raise P9QemuError(f"could not run Drawterm: {error}") from error
     require_secret_absent(profile, result.stdout, label="Drawterm stdout")
     require_secret_absent(profile, result.stderr, label="Drawterm stderr")
+    require_passwords_absent(redacted_passwords, result.stdout, label="Drawterm stdout")
+    require_passwords_absent(redacted_passwords, result.stderr, label="Drawterm stderr")
     return result
 
 
@@ -394,3 +440,268 @@ def run_pexpect_drawterm_validation(
         raise
     finally:
         _terminate(child)
+
+
+def _spawn_password_rotation_qemu(command: list[str], *, phase: str) -> pexpect.spawn:
+    if not command:
+        raise P9QemuError(f"cannot start an empty {phase} QEMU command")
+    try:
+        return pexpect.spawn(
+            command[0],
+            command[1:],
+            encoding="utf-8",
+            codec_errors="replace",
+            echo=False,
+            timeout=None,
+        )
+    except (OSError, pexpect.ExceptionPexpect) as error:
+        raise P9QemuError(f"could not start {phase} QEMU: {error}") from error
+
+
+def _run_after_protocol_readiness(
+    command: list[str],
+    profile: DrawtermPostinstallProfile,
+    *,
+    password: str,
+    timeout_seconds: int,
+    progress: Progress,
+    label: str,
+    input_text: str | None = None,
+    redacted_passwords: tuple[str, ...],
+) -> tuple[subprocess.CompletedProcess[str], int]:
+    """Retry only the qualified pre-authentication p9any hangup."""
+
+    for attempt in range(1, 11):
+        result = _run_drawterm(
+            command,
+            profile,
+            timeout_seconds=timeout_seconds,
+            password=password,
+            input_text=input_text,
+            redacted_passwords=redacted_passwords,
+        )
+        output = "\n".join((result.stdout, result.stderr))
+        if result.returncode == 0 or not is_drawterm_protocol_readiness_failure(output):
+            return result, attempt
+        if attempt == 10:
+            break
+        progress(f"{label} attempt {attempt} reached p9any too early; retrying.")
+        time.sleep(1)
+    raise P9QemuError(f"{label} did not pass p9any readiness after 10 attempts")
+
+
+def _password_rotation_command_set(
+    drawterm_executable: Path,
+    profile: DrawtermPostinstallProfile,
+) -> tuple[list[str], list[str], list[str], list[str]]:
+    return (
+        build_drawterm_command(
+            drawterm_executable, profile, build_rotation_guest_command()
+        ),
+        build_drawterm_command(
+            drawterm_executable, profile, build_old_password_probe_command()
+        ),
+        build_drawterm_command(
+            drawterm_executable, profile, build_new_password_probe_command()
+        ),
+        build_drawterm_command(
+            drawterm_executable, profile, build_rotation_shutdown_command()
+        ),
+    )
+
+
+def _scrubbed_output(
+    result: subprocess.CompletedProcess[str] | None,
+) -> tuple[str, str]:
+    if result is None:
+        return "", ""
+    return result.stdout, result.stderr
+
+
+def run_pexpect_drawterm_password_rotation(
+    mutation_qemu_command: list[str],
+    verification_qemu_command: list[str],
+    profile: DrawtermPostinstallProfile,
+    *,
+    new_password: str,
+    drawterm_executable: Path,
+    mutation_console_log: Path,
+    verification_console_log: Path,
+    progress: Progress,
+) -> tuple[PasswordRotationResult, tuple[list[str], ...], tuple[int, ...]]:
+    """Rotate NVRAM in an overlay, cold boot, and prove old/new behavior."""
+
+    if not drawterm_executable.is_file() or not os.access(drawterm_executable, os.X_OK):
+        raise P9QemuError(
+            f"Drawterm executable is not an executable file: {drawterm_executable}"
+        )
+    wrkey_input = build_wrkey_input(profile, new_password)
+    passwords = (profile.nvram.password, new_password)
+    commands = _password_rotation_command_set(drawterm_executable, profile)
+    for index, command in enumerate(commands, start=1):
+        require_passwords_absent(
+            passwords,
+            "\n".join(command),
+            label=f"password-rotation Drawterm argv {index}",
+        )
+
+    mutation: subprocess.CompletedProcess[str] | None = None
+    old_probe: subprocess.CompletedProcess[str] | None = None
+    new_probe: subprocess.CompletedProcess[str] | None = None
+    shutdown: subprocess.CompletedProcess[str] | None = None
+    attempt_counts: list[int] = []
+    checks: list[PasswordRotationCheck] = []
+
+    try:
+        require_drawterm_ports_available(profile)
+        mutation_child = _spawn_password_rotation_qemu(
+            mutation_qemu_command, phase="password-mutation"
+        )
+        try:
+            _wait_for_unattended_boot(mutation_child, profile, progress=progress)
+            _wait_for_drawterm_services(mutation_child, profile, progress=progress)
+            mutation, attempts = _run_after_protocol_readiness(
+                commands[0],
+                profile,
+                password=profile.nvram.password,
+                input_text=wrkey_input,
+                timeout_seconds=90,
+                progress=progress,
+                label="auth/wrkey mutation",
+                redacted_passwords=passwords,
+            )
+            attempt_counts.append(attempts)
+            checks.extend(
+                validate_mutation_output(
+                    mutation.returncode,
+                    mutation.stdout,
+                    mutation.stderr,
+                    passwords=passwords,
+                )
+            )
+            shutdown_evidence = _wait_for_shutdown(mutation_child, mutation_console_log)
+            checks.append(PasswordRotationCheck("mutation-shutdown", shutdown_evidence))
+            transcript = _read_console_log(mutation_console_log)
+            require_passwords_absent(
+                passwords, transcript, label="password-mutation serial transcript"
+            )
+            validate_unattended_boot_transcript(transcript, profile)
+        finally:
+            _terminate(mutation_child)
+            _wait_for_drawterm_ports_released(profile, progress=progress)
+
+        require_drawterm_ports_available(profile)
+        verification_child = _spawn_password_rotation_qemu(
+            verification_qemu_command, phase="password-verification"
+        )
+        try:
+            _wait_for_unattended_boot(verification_child, profile, progress=progress)
+            _wait_for_drawterm_services(verification_child, profile, progress=progress)
+            old_probe, attempts = _run_after_protocol_readiness(
+                commands[1],
+                profile,
+                password=profile.nvram.password,
+                timeout_seconds=20,
+                progress=progress,
+                label="old-password rejection probe",
+                redacted_passwords=passwords,
+            )
+            attempt_counts.append(attempts)
+            checks.append(
+                validate_old_password_rejection(
+                    old_probe.returncode,
+                    old_probe.stdout,
+                    old_probe.stderr,
+                    passwords=passwords,
+                )
+            )
+            new_probe, attempts = _run_after_protocol_readiness(
+                commands[2],
+                profile,
+                password=new_password,
+                timeout_seconds=60,
+                progress=progress,
+                label="new-password acceptance probe",
+                redacted_passwords=passwords,
+            )
+            attempt_counts.append(attempts)
+            checks.append(
+                validate_new_password_acceptance(
+                    new_probe.returncode,
+                    new_probe.stdout,
+                    new_probe.stderr,
+                    passwords=passwords,
+                )
+            )
+            shutdown, attempts = _run_after_protocol_readiness(
+                commands[3],
+                profile,
+                password=new_password,
+                timeout_seconds=60,
+                progress=progress,
+                label="rotated-password shutdown",
+                redacted_passwords=passwords,
+            )
+            attempt_counts.append(attempts)
+            shutdown_evidence = _wait_for_shutdown(
+                verification_child, verification_console_log
+            )
+            checks.extend(
+                (
+                    PasswordRotationCheck(
+                        "verification-cold-boot",
+                        "the mutated overlay completed a separate unattended boot",
+                    ),
+                    PasswordRotationCheck("verification-shutdown", shutdown_evidence),
+                )
+            )
+            transcript = _read_console_log(verification_console_log)
+            require_passwords_absent(
+                passwords, transcript, label="password-verification serial transcript"
+            )
+            validate_unattended_boot_transcript(transcript, profile)
+        finally:
+            _terminate(verification_child)
+            _wait_for_drawterm_ports_released(profile, progress=progress)
+        checks.append(
+            PasswordRotationCheck(
+                "port-release",
+                "CPU and auth host ports stopped accepting connections after both boots",
+            )
+        )
+    except P9QemuError as error:
+        mutation_stdout, mutation_stderr = _scrubbed_output(mutation)
+        old_stdout, old_stderr = _scrubbed_output(old_probe)
+        new_stdout, new_stderr = _scrubbed_output(new_probe)
+        shutdown_stdout, shutdown_stderr = _scrubbed_output(shutdown)
+        raise PasswordRotationValidationError(
+            str(error),
+            mutation_stdout=mutation_stdout,
+            mutation_stderr=mutation_stderr,
+            old_password_stdout=old_stdout,
+            old_password_stderr=old_stderr,
+            new_password_stdout=new_stdout,
+            new_password_stderr=new_stderr,
+            shutdown_stdout=shutdown_stdout,
+            shutdown_stderr=shutdown_stderr,
+        ) from error
+
+    assert mutation is not None
+    assert old_probe is not None
+    assert new_probe is not None
+    assert shutdown is not None
+    return (
+        PasswordRotationResult(
+            checks=tuple(checks),
+            mutation_stdout=mutation.stdout,
+            mutation_stderr=mutation.stderr,
+            old_password_stdout=old_probe.stdout,
+            old_password_stderr=old_probe.stderr,
+            new_password_stdout=new_probe.stdout,
+            new_password_stderr=new_probe.stderr,
+            shutdown_stdout=shutdown.stdout,
+            shutdown_stderr=shutdown.stderr,
+        ),
+        commands,
+        tuple(attempt_counts),
+    )
