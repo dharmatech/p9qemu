@@ -2,8 +2,21 @@ from pathlib import Path
 
 import pytest
 
+from p9qemu.drawterm_postinstall import load_drawterm_postinstall_profile
 from p9qemu.errors import P9QemuError
-from p9qemu.pexpect_drawterm_validation import _wait_for_shutdown
+import p9qemu.pexpect_drawterm_validation as adapter
+from p9qemu.pexpect_drawterm_validation import (
+    _wait_for_drawterm_ports_released,
+    _wait_for_shutdown,
+)
+
+
+PROFILE_PATH = (
+    Path(__file__).parents[1]
+    / "images"
+    / "p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001"
+    / "postinstall.json"
+)
 
 
 class FakeChild:
@@ -42,3 +55,15 @@ def test_qemu_eof_without_filesystem_shutdown_evidence_is_rejected(
     write_log(log, "init: starting /bin/rc\n")
     with pytest.raises(P9QemuError, match="without done halting or HJFS"):
         _wait_for_shutdown(FakeChild([1]), log)
+
+
+def test_post_shutdown_ports_need_only_stop_accepting_connections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile = load_drawterm_postinstall_profile(PROFILE_PATH)
+    monkeypatch.setattr(adapter, "_connectable", lambda _address, _port: False)
+    messages: list[str] = []
+    _wait_for_drawterm_ports_released(profile, progress=messages.append)
+    assert messages == [
+        "Confirmed CPU and auth host ports stopped accepting connections."
+    ]

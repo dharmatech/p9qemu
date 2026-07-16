@@ -83,14 +83,17 @@ def _wait_for_drawterm_ports_released(
 ) -> None:
     deadline = time.monotonic() + 10
     while True:
-        try:
-            require_drawterm_ports_available(profile)
-            progress("Confirmed CPU and auth host ports were released.")
+        if not any(
+            _connectable(profile.drawterm.bind_address, port)
+            for port in _ports(profile)
+        ):
+            progress("Confirmed CPU and auth host ports stopped accepting connections.")
             return
-        except P9QemuError:
-            if time.monotonic() >= deadline:
-                raise
-            time.sleep(0.25)
+        if time.monotonic() >= deadline:
+            raise P9QemuError(
+                "CPU or auth host port still accepts connections after QEMU exit"
+            )
+        time.sleep(0.25)
 
 
 def _terminate(child: pexpect.spawn) -> None:
@@ -363,7 +366,8 @@ def run_pexpect_drawterm_validation(
             ),
             DrawtermAcceptanceCheck("orderly-shutdown", shutdown_evidence),
             DrawtermAcceptanceCheck(
-                "port-release", "CPU and auth host ports were released after shutdown"
+                "port-release",
+                "CPU and auth host ports stopped accepting connections after shutdown",
             ),
         )
         return (
