@@ -151,11 +151,15 @@ def build_automated_validation_command(
     console_log: Path,
     memory_mib: int,
     acceleration: Acceleration,
+    forwards: tuple[PortForward, ...] = (),
     mac_address: str = DEFAULT_MAC_ADDRESS,
 ) -> list[str]:
     """Build the dedicated-serial command for disposable-overlay validation."""
 
     log_value = _option_path(console_log, "console log", "-chardev")
+    user_network = "user"
+    if forwards:
+        user_network += "," + ",".join(item.qemu_value() for item in forwards)
     return [
         *_base_command(
             executable,
@@ -164,7 +168,7 @@ def build_automated_validation_command(
             mac_address=mac_address,
         ),
         "-net",
-        "user",
+        user_network,
         *_disk_arguments(overlay),
         "-nographic",
         "-monitor",

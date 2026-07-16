@@ -6,6 +6,7 @@ from p9qemu.errors import P9QemuError
 from p9qemu.host import Acceleration
 from p9qemu.qemu import (
     DEFAULT_PORT_FORWARDS,
+    PortForward,
     build_automated_install_command,
     build_automated_validation_command,
     build_install_command,
@@ -130,6 +131,23 @@ def test_automated_validation_boots_only_the_overlay_on_logged_serial() -> None:
         "chardev:serial0",
         "-no-reboot",
     ]
+
+
+def test_automated_validation_can_forward_only_drawterm_loopback_ports() -> None:
+    command = build_automated_validation_command(
+        "qemu-system-x86_64",
+        overlay=Path("run") / "validation-overlay.qcow2",
+        console_log=Path("run") / "boot.raw.log",
+        memory_mib=2048,
+        acceleration=KVM,
+        forwards=(PortForward(17019, 17019), PortForward(17567, 567)),
+    )
+    network = command[command.index("-net", 8) + 1]
+    assert network == (
+        "user,hostfwd=tcp:127.0.0.1:17019-:17019,hostfwd=tcp:127.0.0.1:17567-:567"
+    )
+    assert "-nographic" in command
+    assert "-display" not in command
 
 
 def test_posix_rendering_is_copyable() -> None:
