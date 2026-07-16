@@ -227,7 +227,4 @@ $ uv run p9qemu --help
 Tests never download the production ISO, create a real large disk, launch a VM,
 or require QEMU to be installed.
 
-Design notes live in [`docs/design`](docs/design), including the
-[Windows acceleration experiment log](docs/design/03-windows-whpx-experiments.md),
-the [multi-VM networking feasibility study](docs/design/07-multiple-plan9-vms.md),
-and the [downloadable lab direction](docs/design/08-downloadable-multi-vm-labs.md).
+Design notes live in [`docs/design`](docs/design).
