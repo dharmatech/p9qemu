@@ -6,6 +6,7 @@ from p9qemu.drawterm_postinstall import load_drawterm_postinstall_profile
 from p9qemu.errors import P9QemuError
 import p9qemu.pexpect_drawterm_validation as adapter
 from p9qemu.pexpect_drawterm_validation import (
+    _wait_for_drawterm_ports_bindable,
     _wait_for_drawterm_ports_released,
     _wait_for_shutdown,
 )
@@ -66,4 +67,27 @@ def test_post_shutdown_ports_need_only_stop_accepting_connections(
     _wait_for_drawterm_ports_released(profile, progress=messages.append)
     assert messages == [
         "Confirmed CPU and auth host ports stopped accepting connections."
+    ]
+
+
+def test_second_boot_waits_until_time_wait_ports_are_bindable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile = load_drawterm_postinstall_profile(PROFILE_PATH)
+    attempts = 0
+
+    def require_available(_profile) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise P9QemuError("address already in use")
+
+    monkeypatch.setattr(adapter, "require_drawterm_ports_available", require_available)
+    monkeypatch.setattr(adapter.time, "sleep", lambda _seconds: None)
+    messages: list[str] = []
+    _wait_for_drawterm_ports_bindable(profile, progress=messages.append)
+    assert attempts == 3
+    assert messages == [
+        "Waiting for CPU and auth host ports to leave TIME_WAIT before cold boot.",
+        "Confirmed CPU and auth host ports are bindable for cold boot.",
     ]

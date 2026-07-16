@@ -118,6 +118,32 @@ def require_drawterm_ports_available(profile: DrawtermPostinstallProfile) -> Non
             candidate.close()
 
 
+def _wait_for_drawterm_ports_bindable(
+    profile: DrawtermPostinstallProfile, *, progress: Progress
+) -> None:
+    """Wait through Linux TIME_WAIT before launching the second QEMU process."""
+
+    deadline = time.monotonic() + 90
+    reported = False
+    while True:
+        try:
+            require_drawterm_ports_available(profile)
+            progress("Confirmed CPU and auth host ports are bindable for cold boot.")
+            return
+        except P9QemuError as error:
+            if time.monotonic() >= deadline:
+                raise P9QemuError(
+                    "CPU or auth host port did not become bindable within 90 seconds"
+                ) from error
+            if not reported:
+                progress(
+                    "Waiting for CPU and auth host ports to leave TIME_WAIT "
+                    "before cold boot."
+                )
+                reported = True
+            time.sleep(0.25)
+
+
 def _wait_for_drawterm_ports_released(
     profile: DrawtermPostinstallProfile, *, progress: Progress
 ) -> None:
@@ -590,7 +616,7 @@ def run_pexpect_drawterm_password_rotation(
             _terminate(mutation_child)
             _wait_for_drawterm_ports_released(profile, progress=progress)
 
-        require_drawterm_ports_available(profile)
+        _wait_for_drawterm_ports_bindable(profile, progress=progress)
         verification_child = _spawn_password_rotation_qemu(
             verification_qemu_command, phase="password-verification"
         )
