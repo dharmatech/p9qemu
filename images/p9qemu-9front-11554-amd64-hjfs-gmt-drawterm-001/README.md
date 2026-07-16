@@ -1,8 +1,8 @@
 # 9front 11554 AMD64 HJFS GMT Drawterm image
 
-> **Prerelease candidate.** Candidate 001 is immutable but remains a
-> prerelease until fresh public-download acceptance is complete on Linux and
-> Windows.
+> **Prerelease candidate.** Candidate 001 is immutable and has completed fresh
+> public-download acceptance on Linux and Windows. It remains a prerelease
+> pending an explicit promotion decision.
 
 This variant starts with the immutable
 [stock candidate 002](../p9qemu-9front-11554-amd64-hjfs-gmt-002/README.md),
@@ -93,8 +93,9 @@ The separate security-mutation gate has also passed:
   prove the old demonstration password no longer authenticates, and prove the
   generated replacement password does authenticate.
 
-All automated gates are complete. Fresh end-user acceptance against the public
-prerelease is still required before any promotion decision.
+All automated gates and fresh end-user acceptance against the public
+prerelease are complete. Candidate 001 remains a prerelease pending an explicit
+promotion decision.
 
 ## Local preparation checkpoint (2026-07-15)
 
@@ -253,10 +254,9 @@ support. An isolated native-Windows `p9qemu image create --dry-run` fetched and
 verified only the public manifest, printed the pinned archive and image
 digests, and created neither an archive nor an instance.
 
-The prerelease remains a candidate until the complete fresh-cache end-user
-workflow downloads the public archive, creates a writable overlay, boots the
-unattended CPU server, authenticates with graphical and command-line Drawterm,
-checks networking, and shuts down cleanly on the supported hosts.
+The required fresh-cache end-user workflow has now completed on Windows and
+Linux, as recorded below. The release remains a candidate until an explicit
+promotion decision is made.
 
 ## Public Windows end-user acceptance (2026-07-15)
 
@@ -307,5 +307,62 @@ listening.
 
 After acceptance, Windows reported 178942939136 free bytes. The Ubuntu WSL
 VHDX remained exactly 219465908224 bytes. The verified Windows cache and small
-acceptance overlay are retained pending the Linux public end-user gate and the
-cleanup decision.
+acceptance overlay are retained pending the cross-platform cleanup decision.
+
+## Public Linux end-user acceptance (2026-07-16)
+
+The Linux gate started in an empty dedicated WSL VM directory with P9QEMU
+0.1.0 installed from public repository commit
+`796cfa7af534164f8d2297b349321017997151f0`. The command set
+`XDG_CACHE_HOME` to a cache beneath that directory so the gate could prove a
+cold public download without reusing or modifying the user's normal P9QEMU
+cache. This test-only override is not required for ordinary use.
+
+The public `p9qemu image create` workflow fetched and verified the 1472-byte
+manifest, downloaded the 250535781-byte archive, matched both published
+SHA-256 digests, verified and cached the standalone read-only QCOW2, and
+created `instance-kvm` as a writable overlay with that exact cached base as its
+QCOW2 backing file.
+
+`p9qemu start --instance instance-kvm --dry-run --accel kvm` fully reverified
+the instance and rendered the qualified Linux profile `-cpu host -accel kvm`.
+The real start reached the unattended CPU/auth service. Native Windows
+Drawterm connected graphically across the WSL loopback forwards and started
+Rio with the public demonstration credential. Inside Rio, the user was
+`glenda`, the system name was `cirno`, the working directory was
+`/usr/glenda`, the persistent timezone matched GMT, and a ping to `google.com`
+succeeded.
+
+A separate native-Linux command-line Drawterm connection printed the exact
+marker and identity:
+
+```text
+P9QEMU_CLI_OK
+glenda
+cirno
+```
+
+The Linux Drawterm executable had SHA-256
+`f808e2eedebdf7ea19bccaeac84d4d7cdd424279912d2efeeab3ba0cefa35a78`.
+Its adjacent source checkout was at commit
+`8a88fb5b8c75450d2e20ae1c7839d823bb1f6fad` and contained untracked build
+products. The executable was not rebuilt as part of this gate, so this
+acceptance record binds the binary digest rather than claiming a reproducible
+source build.
+
+Command-line `fshalt` closed QEMU. The post-halt P9QEMU verifier passed again.
+Both the 851968-byte overlay and the 559022080-byte cached base passed
+`qemu-img check`, reported clean QCOW2 dirty and corruption flags, and retained
+the exact QCOW2 backing relationship. The base remained mode `0444`, and its
+SHA-256 remained
+`7ff689b7b614f6884bf0a1ac525fca10b750934d99640e744823f450d28ff6b8`.
+The acceptance overlay had SHA-256
+`9b0b52bc8d10e51da3c1bb55856a6a92b6377f1d5a6b52f0f2cace5931eedb5c`.
+No QEMU or Drawterm process remained, and neither loopback service port was
+listening.
+
+After the Linux gate, Windows reported 175899619328 free bytes. The dedicated
+WSL acceptance tree used 773 MiB, while the writable overlay itself remained
+under 1 MiB. The Ubuntu WSL VHDX remained exactly 219465908224 bytes, unchanged
+from the Windows acceptance checkpoint. The isolated cache and acceptance
+overlay are retained pending the promotion and cleanup decisions.
