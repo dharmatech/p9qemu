@@ -35,10 +35,20 @@ Progress = Callable[[str], None]
 class DrawtermValidationError(P9QemuError):
     """A validation failure carrying already-redacted attempt evidence."""
 
-    def __init__(self, message: str, *, session_stdout: str, session_stderr: str):
+    def __init__(
+        self,
+        message: str,
+        *,
+        session_stdout: str,
+        session_stderr: str,
+        shutdown_stdout: str,
+        shutdown_stderr: str,
+    ):
         super().__init__(message)
         self.session_stdout = session_stdout
         self.session_stderr = session_stderr
+        self.shutdown_stdout = shutdown_stdout
+        self.shutdown_stderr = shutdown_stderr
 
 
 def _ports(profile: DrawtermPostinstallProfile) -> tuple[int, int]:
@@ -219,17 +229,23 @@ def _read_console_log(path: Path) -> str:
         raise P9QemuError(f"could not read QEMU serial transcript: {error}") from error
 
 
-def _wait_for_shutdown(child: pexpect.spawn) -> None:
+def _wait_for_shutdown(child: pexpect.spawn, console_log: Path) -> str:
     try:
-        child.expect(re.escape("done halting"), timeout=60)
+        index = child.expect([re.escape("done halting"), pexpect.EOF], timeout=60)
     except pexpect.TIMEOUT as error:
         raise P9QemuError("timed out waiting for guest fshalt") from error
-    except pexpect.EOF as error:
-        raise P9QemuError("QEMU exited before reporting done halting") from error
+    if index == 1:
+        transcript = _read_console_log(console_log)
+        if "hjfs: ending" not in transcript:
+            raise P9QemuError(
+                "QEMU exited without done halting or HJFS shutdown evidence"
+            )
+        return "HJFS reported ending before QEMU exited"
     try:
         child.expect(pexpect.EOF, timeout=60)
     except pexpect.TIMEOUT as error:
         raise P9QemuError("QEMU did not exit after guest fshalt") from error
+    return "guest reported done halting before QEMU exited"
 
 
 def run_pexpect_drawterm_validation(
@@ -312,8 +328,8 @@ def run_pexpect_drawterm_validation(
                 )
                 time.sleep(1)
         shutdown = _run_drawterm(shutdown_command, profile, timeout_seconds=60)
-        _wait_for_shutdown(child)
-        progress("Guest completed fshalt and QEMU exited.")
+        shutdown_evidence = _wait_for_shutdown(child, console_log)
+        progress(f"Guest completed fshalt: {shutdown_evidence}.")
         combined_session = "\n".join(
             [
                 *(
@@ -345,9 +361,7 @@ def run_pexpect_drawterm_validation(
                 "drawterm-session-attempts",
                 f"bounded attempts per acceptance command: {attempt_counts}",
             ),
-            DrawtermAcceptanceCheck(
-                "orderly-shutdown", "guest completed fshalt and QEMU exited"
-            ),
+            DrawtermAcceptanceCheck("orderly-shutdown", shutdown_evidence),
             DrawtermAcceptanceCheck(
                 "port-release", "CPU and auth host ports were released after shutdown"
             ),
@@ -370,6 +384,8 @@ def run_pexpect_drawterm_validation(
                 str(error),
                 session_stdout=_attempt_log(attempts, "stdout"),
                 session_stderr=_attempt_log(attempts, "stderr"),
+                shutdown_stdout=shutdown.stdout if shutdown is not None else "",
+                shutdown_stderr=shutdown.stderr if shutdown is not None else "",
             ) from error
         raise
     finally:

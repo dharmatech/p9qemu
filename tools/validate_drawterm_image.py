@@ -351,6 +351,14 @@ def run(argv: list[str] | None = None) -> int:
                     write_text_new(paths.drawterm_stdout, error.session_stdout)
                 if not paths.drawterm_stderr.exists():
                     write_text_new(paths.drawterm_stderr, error.session_stderr)
+                if not paths.drawterm_shutdown_stdout.exists():
+                    write_text_new(
+                        paths.drawterm_shutdown_stdout, error.shutdown_stdout
+                    )
+                if not paths.drawterm_shutdown_stderr.exists():
+                    write_text_new(
+                        paths.drawterm_shutdown_stderr, error.shutdown_stderr
+                    )
             try:
                 disk_hash_after = sha256_file(disk)
             except P9QemuError:
