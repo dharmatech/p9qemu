@@ -26,7 +26,7 @@ are documented in
 
 - [`p9qemu-9front-11554-amd64-hjfs-gmt-002`](p9qemu-9front-11554-amd64-hjfs-gmt-002/README.md) — concise P9QEMU quick start for the published stock
   post-install prerelease candidate.
-- [`p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001`](p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001/README.md) — automated-core-and-password-rotation-validated build definition for the not-yet-published, unattended-boot Drawterm derivative.
+- [`p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001`](p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001/README.md) — immutable prerelease candidate for the unattended-boot Drawterm derivative, with automated core and password-rotation validation.
 
 ## Reference builds
 

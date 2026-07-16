@@ -1,0 +1,44 @@
+{
+  "artifact": {
+    "filename": "p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001.tar.gz",
+    "packaging": "tar-gzip",
+    "sha256": "2760028a2b13a844d33436f2d85140f6798ee84546c8668f1ffaa3bd135cb24f",
+    "size": 250535781,
+    "url": "https://github.com/dharmatech/p9qemu/releases/download/ready-9front-11554-amd64-hjfs-gmt-drawterm-001/p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001.tar.gz"
+  },
+  "bundle": {
+    "extracted_size": 559043403,
+    "file_count": 17,
+    "manifest_path": "manifest.json",
+    "manifest_sha256": "3a139b189dd55bf538d1011e06676c25df07a265caef87bf1f4ce811fbc06d2c",
+    "member_count": 22,
+    "root": "p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001"
+  },
+  "guest": {
+    "architecture": "amd64",
+    "distribution": "9front",
+    "release": "11554"
+  },
+  "id": "p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001",
+  "image": {
+    "format": "qcow2",
+    "path": "p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001.qcow2",
+    "sha256": "7ff689b7b614f6884bf0a1ac525fca10b750934d99640e744823f450d28ff6b8",
+    "stored_size": 559022080,
+    "virtual_size": 32212254720
+  },
+  "kind": "p9qemu-ready-image",
+  "runtime": {
+    "capabilities": [
+      "unattended-boot",
+      "serial-diagnostics",
+      "drawterm",
+      "loopback-services",
+      "networking"
+    ],
+    "profile": "9front-11554-amd64-hjfs-gmt-drawterm-v1"
+  },
+  "schema": 1,
+  "title": "9front 11554 AMD64 HJFS GMT Drawterm image (candidate 001)",
+  "variant": "drawterm"
+}
