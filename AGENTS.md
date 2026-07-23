@@ -37,6 +37,11 @@ on Windows and Linux. Preserve these invariants:
   immutable.
 - Keep ready-image bases in a verified content-addressed cache and writable
   guest state in per-instance QCOW2 overlays.
+- Keep the default host-forward address at `127.0.0.1`. Explicit
+  `--host-forward-address` values must remain canonical IPv4 loopback literals
+  and may change only host-side QEMU listener addresses, not guest networking
+  or guest service ports. Start dry-run performs the same local listener
+  preflight as a real start.
 - Preserve the documented dry-run boundaries: installer dry-run is local-only,
   while ready-image creation dry-run may fetch only the bounded manifest.
 - Keep the runtime dependency-free outside the Python standard library unless a
