@@ -165,6 +165,17 @@ def build_parser() -> argparse.ArgumentParser:
             f"(default: {DEFAULT_HOST_FORWARD_ADDRESS})"
         ),
     )
+    start.add_argument(
+        "--serial-console",
+        action="store_true",
+        help="route guest COM1 to this terminal while retaining graphics",
+    )
+    start.add_argument(
+        "--serial-log",
+        type=Path,
+        metavar="PATH",
+        help="record guest COM1 to a new raw log while retaining graphics",
+    )
 
     image = commands.add_parser(
         "image", help="acquire ready images and create writable instances"
@@ -202,6 +213,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _absolute(path: Path) -> Path:
     return path.expanduser().resolve()
+
+
+def _validate_new_serial_log(path: Path) -> None:
+    if path.exists():
+        raise P9QemuError(f"refusing to replace serial log: {path}")
+    if not path.parent.is_dir():
+        raise P9QemuError(f"serial log parent directory does not exist: {path.parent}")
+
+
+def _reserve_serial_log(path: Path) -> None:
+    try:
+        path.open("xb").close()
+    except FileExistsError as error:
+        raise P9QemuError(f"refusing to replace serial log: {path}") from error
+    except OSError as error:
+        raise P9QemuError(f"could not create serial log: {path}: {error}") from error
 
 
 def _progress(quiet: bool):
@@ -379,6 +406,9 @@ def _start(args: argparse.Namespace) -> int:
     executables = discover_qemu(host)
     acceleration = _select_acceleration(args.accel, host, executables.system)
     progress = _progress(args.quiet)
+    serial_log = _absolute(args.serial_log) if args.serial_log is not None else None
+    if serial_log is not None:
+        _validate_new_serial_log(serial_log)
     summary: list[tuple[str, object]] = []
     if args.instance is not None:
         instance_root = _absolute(args.instance)
@@ -409,6 +439,10 @@ def _start(args: argparse.Namespace) -> int:
             ("Host-forward address", args.host_forward_address),
         )
     )
+    if args.serial_console:
+        summary.append(("Serial console", "terminal (interactive)"))
+    if serial_log is not None:
+        summary.append(("Serial log", serial_log))
     forwards = port_forwards_for_host_address(args.host_forward_address)
     command = build_start_command(
         executables.system,
@@ -416,8 +450,12 @@ def _start(args: argparse.Namespace) -> int:
         memory_mib=args.memory,
         acceleration=acceleration,
         forwards=forwards,
+        serial_console=args.serial_console,
+        serial_log=serial_log,
     )
     require_port_forwards_available(forwards)
+    if serial_log is not None and not args.dry_run:
+        _reserve_serial_log(serial_log)
     _write_summary(progress, summary)
     return _run_qemu(
         command,

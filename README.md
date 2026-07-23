@@ -238,6 +238,50 @@ commands through a shell. `--disk` and `--instance` are mutually exclusive:
 `--disk` retains the existing standalone-disk workflow, while `--instance`
 selects the verified overlay layout created by `p9qemu image create`.
 
+### Observe the serial console while retaining graphics
+
+The normal graphical start remains the default. To keep the QEMU graphical
+display while routing the guest's COM1 serial channel to the invoking terminal,
+use:
+
+```console
+$ p9qemu start --instance my-ready-9front --serial-console
+```
+
+The serial channel is interactive: terminal input is sent to the guest. To
+record the same raw COM1 traffic in a new file, add `--serial-log`:
+
+```console
+$ p9qemu start --instance my-ready-9front \
+    --serial-console \
+    --serial-log boot.raw.log
+```
+
+`--serial-log` may also be used without `--serial-console`. In that form, the
+serial channel remains available through QEMU's graphical virtual console and
+is also recorded:
+
+```console
+$ p9qemu start --instance my-ready-9front --serial-log boot.raw.log
+```
+
+P9QEMU resolves the log to an absolute path, requires its parent directory to
+exist, and atomically reserves a new empty file before launch. It refuses to
+replace or append to an existing path. Dry-run performs all local validation
+and prints the exact serial-routing command without creating the file.
+
+These options expose the guest serial device; they do not copy the graphical
+framebuffer or arbitrary Rio-window contents. The published stock and Drawterm
+ready images configure `console=0`, so their boot messages and diagnostics use
+COM1 while Rio remains graphical. Other standalone disks may remain silent
+unless their guest configuration selects a serial console.
+
+Serial logs are raw evidence and may contain commands, guest data, or secrets.
+Serial output is useful for boot diagnostics but is not by itself a structured
+Drawterm-readiness signal. When `--serial-console` is combined with `--quiet`,
+P9QEMU suppresses its routine summary and command display while QEMU's guest
+serial traffic remains visible.
+
 ## Development
 
 Clone the repository and let uv create the locked development environment:

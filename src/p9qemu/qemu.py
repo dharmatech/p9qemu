@@ -201,6 +201,31 @@ def build_automated_validation_command(
     ]
 
 
+def _start_serial_arguments(
+    *,
+    serial_console: bool,
+    serial_log: Path | None,
+) -> list[str]:
+    if not serial_console and serial_log is None:
+        return []
+
+    backend = "stdio" if serial_console else "vc"
+    chardev = f"{backend},id=serial0"
+    if serial_log is not None:
+        log_value = _option_path(serial_log, "serial log", "-chardev")
+        # Public start reserves a new empty log before launch. Appending lets
+        # QEMU use that exclusively created file without ever truncating it.
+        chardev += f",logfile={log_value},logappend=on"
+    return [
+        "-monitor",
+        "none",
+        "-chardev",
+        chardev,
+        "-serial",
+        "chardev:serial0",
+    ]
+
+
 def build_start_command(
     executable: str,
     *,
@@ -209,6 +234,8 @@ def build_start_command(
     acceleration: Acceleration,
     forwards: tuple[PortForward, ...] = DEFAULT_PORT_FORWARDS,
     mac_address: str = DEFAULT_MAC_ADDRESS,
+    serial_console: bool = False,
+    serial_log: Path | None = None,
 ) -> list[str]:
     user_network = "user"
     if forwards:
@@ -223,6 +250,10 @@ def build_start_command(
         *_disk_arguments(disk),
         "-net",
         user_network,
+        *_start_serial_arguments(
+            serial_console=serial_console,
+            serial_log=serial_log,
+        ),
     ]
 
 

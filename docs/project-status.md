@@ -13,8 +13,10 @@ P9QEMU remains in early version 1 development, but its principal installation,
 startup, ready-image, and Drawterm-ready workflows have completed real Windows
 and Linux acceptance and are being used by downstream projects. The explicit
 per-start host-forward address milestone is implemented and has completed
-native-Windows TCG and Ubuntu-under-WSL KVM acceptance. No next implementation
-objective is currently selected.
+native-Windows TCG and Ubuntu-under-WSL KVM acceptance. Opt-in graphical-plus-
+serial startup and new-file serial logging are implemented with automated
+coverage; live acceptance of the public options remains pending on Windows and
+Linux. No subsequent implementation objective is currently selected.
 
 ## Implemented user workflows
 
@@ -26,6 +28,10 @@ The public CLI currently provides:
 - `p9qemu start --instance ...` for ready-image instances;
 - `p9qemu start --host-forward-address 127.x.y.z` for repeating the complete
   host-forward map on an explicit IPv4 loopback address;
+- `p9qemu start --serial-console` for retaining graphics while exposing the
+  interactive guest COM1 channel in the invoking terminal;
+- `p9qemu start --serial-log PATH` for recording COM1 to a new raw log, with or
+  without terminal routing;
 - `--dry-run`, `--quiet`, memory, disk, media, and acceleration controls; and
 - aligned human-readable summaries plus the exact platform-native QEMU command.
 
@@ -97,6 +103,10 @@ changed before broadening network exposure through some other QEMU profile.
 - Explicit host-forward addresses are supplied per start and are not allocated
   automatically or persisted in instance metadata. WHPX-specific concurrency,
   crash recovery, and guest-to-guest lab networking remain future work.
+- Serial routing does not modify guest boot settings, copy the graphical
+  framebuffer, or establish Drawterm readiness. Arbitrary standalone disks may
+  be silent unless they configure COM1. Serial logs are raw, may contain
+  sensitive guest traffic, and always require a new path.
 - Automated installation is pinned to one known installer interaction and must
   be requalified for every new 9front release.
 
@@ -111,7 +121,7 @@ changed before broadening network exposure through some other QEMU profile.
 - Large image gates begin and end with Windows free-space, WSL VHDX, and WSL
   filesystem measurements.
 
-At this review, all 263 pytest tests and `ruff check` pass.
+At this review, all 272 pytest tests and `ruff check` pass.
 `ruff format --check .` reports six previously committed Python files that
 would be reformatted. That formatting baseline predates this documentation
 milestone and should be resolved as a separate, reviewable cleanup rather than

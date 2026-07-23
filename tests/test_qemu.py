@@ -72,6 +72,10 @@ def test_start_command_includes_kvm_and_all_known_forwards() -> None:
     network = command[-1]
     for forward in DEFAULT_PORT_FORWARDS:
         assert forward.qemu_value() in network
+    assert "-monitor" not in command
+    assert "-chardev" not in command
+    assert "-serial" not in command
+    assert "-nographic" not in command
 
 
 def test_host_forward_address_rewrites_only_listener_addresses() -> None:
@@ -101,6 +105,80 @@ def test_explicit_default_host_forward_address_keeps_command_unchanged() -> None
         **arguments,
         forwards=port_forwards_for_host_address("127.0.0.1"),
     )
+
+
+def test_start_routes_serial_to_terminal_without_disabling_graphics() -> None:
+    command = build_start_command(
+        "qemu-system-x86_64",
+        disk=Path("9front.qcow2.img"),
+        memory_mib=2048,
+        acceleration=TCG,
+        serial_console=True,
+    )
+
+    assert command[-6:] == [
+        "-monitor",
+        "none",
+        "-chardev",
+        "stdio,id=serial0",
+        "-serial",
+        "chardev:serial0",
+    ]
+    assert "-nographic" not in command
+
+
+def test_start_command_can_log_serial_while_retaining_graphical_console() -> None:
+    serial_log = Path("run") / "boot.raw.log"
+    command = build_start_command(
+        "qemu-system-x86_64",
+        disk=Path("9front.qcow2.img"),
+        memory_mib=2048,
+        acceleration=TCG,
+        serial_log=serial_log,
+    )
+
+    assert command[-6:] == [
+        "-monitor",
+        "none",
+        "-chardev",
+        f"vc,id=serial0,logfile={serial_log},logappend=on",
+        "-serial",
+        "chardev:serial0",
+    ]
+    assert "-nographic" not in command
+
+
+def test_start_command_can_show_and_log_the_same_serial_stream() -> None:
+    serial_log = Path("run") / "boot.raw.log"
+    command = build_start_command(
+        "qemu-system-x86_64",
+        disk=Path("9front.qcow2.img"),
+        memory_mib=2048,
+        acceleration=TCG,
+        serial_console=True,
+        serial_log=serial_log,
+    )
+
+    assert command[-6:] == [
+        "-monitor",
+        "none",
+        "-chardev",
+        f"stdio,id=serial0,logfile={serial_log},logappend=on",
+        "-serial",
+        "chardev:serial0",
+    ]
+    assert "-nographic" not in command
+
+
+def test_comma_in_start_serial_log_path_is_rejected() -> None:
+    with pytest.raises(P9QemuError, match="serial log path contains a comma"):
+        build_start_command(
+            "qemu-system-x86_64",
+            disk=Path("9front.qcow2.img"),
+            memory_mib=2048,
+            acceleration=TCG,
+            serial_log=Path("bad,log.txt"),
+        )
 
 
 def test_automated_install_has_dedicated_logged_serial_without_monitor() -> None:

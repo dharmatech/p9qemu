@@ -54,11 +54,24 @@ def test_parser_defaults() -> None:
     assert start.instance is None
     assert start.memory == 2048
     assert start.host_forward_address == "127.0.0.1"
+    assert start.serial_console is False
+    assert start.serial_log is None
 
     addressed_start = cli.build_parser().parse_args(
         ["start", "--host-forward-address", "127.0.0.20"]
     )
     assert addressed_start.host_forward_address == "127.0.0.20"
+
+    serial_start = cli.build_parser().parse_args(
+        [
+            "start",
+            "--serial-console",
+            "--serial-log",
+            "boot.raw.log",
+        ]
+    )
+    assert serial_start.serial_console is True
+    assert serial_start.serial_log == Path("boot.raw.log")
 
     image_create = cli.build_parser().parse_args(
         [
@@ -118,6 +131,181 @@ def test_start_dry_run_prints_runtime_forwards(
     ) in output
     assert "Would start QEMU:" in output
     assert "hostfwd=tcp:127.0.0.1:17564-:564" in output
+
+
+def test_start_dry_run_shows_graphical_terminal_serial_and_does_not_create_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    disk = tmp_path / "9front.qcow2.img"
+    serial_log = tmp_path / "boot.raw.log"
+    disk.write_bytes(b"disk")
+    configure_fake_windows(monkeypatch, tmp_path / "cache")
+
+    result = cli.run(
+        [
+            "start",
+            "--disk",
+            str(disk),
+            "--serial-console",
+            "--serial-log",
+            str(serial_log),
+            "--dry-run",
+            "--accel",
+            "tcg",
+        ]
+    )
+
+    assert result == 0
+    assert not serial_log.exists()
+    output = capsys.readouterr().out
+    assert "Serial console:       terminal (interactive)" in output
+    assert f"Serial log:           {serial_log}" in output
+    assert "-monitor none" in output
+    assert f"-chardev stdio,id=serial0,logfile={serial_log},logappend=on" in output
+    assert "-serial chardev:serial0" in output
+    assert "-nographic" not in output
+
+
+def test_start_serial_log_reserves_a_new_file_before_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    disk = tmp_path / "9front.qcow2.img"
+    serial_log = tmp_path / "boot.raw.log"
+    disk.write_bytes(b"disk")
+    configure_fake_windows(monkeypatch, tmp_path / "cache")
+    observed: list[tuple[list[str], bool]] = []
+
+    def record_launch(
+        command: list[str], *, system: str, dry_run: bool, quiet: bool
+    ) -> int:
+        assert system == "Windows"
+        assert dry_run is False
+        assert quiet is True
+        observed.append((command, serial_log.exists()))
+        return 0
+
+    monkeypatch.setattr(cli, "_run_qemu", record_launch)
+
+    result = cli.run(
+        [
+            "start",
+            "--disk",
+            str(disk),
+            "--serial-log",
+            str(serial_log),
+            "--accel",
+            "tcg",
+            "--quiet",
+        ]
+    )
+
+    assert result == 0
+    assert observed and observed[0][1] is True
+    assert serial_log.read_bytes() == b""
+    assert any(
+        argument.startswith("vc,id=serial0,logfile=") for argument in observed[0][0]
+    )
+
+
+def test_start_serial_log_refuses_an_existing_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    disk = tmp_path / "9front.qcow2.img"
+    serial_log = tmp_path / "boot.raw.log"
+    disk.write_bytes(b"disk")
+    serial_log.write_bytes(b"preserve me")
+    configure_fake_windows(monkeypatch, tmp_path / "cache")
+
+    result = cli.run(
+        [
+            "start",
+            "--disk",
+            str(disk),
+            "--serial-log",
+            str(serial_log),
+            "--dry-run",
+            "--accel",
+            "tcg",
+        ]
+    )
+
+    assert result == 1
+    assert serial_log.read_bytes() == b"preserve me"
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"refusing to replace serial log: {serial_log}" in captured.err
+
+
+def test_start_serial_log_reservation_closes_the_preflight_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    disk = tmp_path / "9front.qcow2.img"
+    serial_log = tmp_path / "boot.raw.log"
+    disk.write_bytes(b"disk")
+    configure_fake_windows(monkeypatch, tmp_path / "cache")
+
+    def claim_log(_forwards) -> None:
+        serial_log.write_bytes(b"claimed during preflight")
+
+    monkeypatch.setattr(cli, "require_port_forwards_available", claim_log)
+
+    result = cli.run(
+        [
+            "start",
+            "--disk",
+            str(disk),
+            "--serial-log",
+            str(serial_log),
+            "--accel",
+            "tcg",
+            "--quiet",
+        ]
+    )
+
+    assert result == 1
+    assert serial_log.read_bytes() == b"claimed during preflight"
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"refusing to replace serial log: {serial_log}" in captured.err
+
+
+def test_start_serial_log_requires_an_existing_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    disk = tmp_path / "9front.qcow2.img"
+    serial_log = tmp_path / "missing" / "boot.raw.log"
+    disk.write_bytes(b"disk")
+    configure_fake_windows(monkeypatch, tmp_path / "cache")
+
+    result = cli.run(
+        [
+            "start",
+            "--disk",
+            str(disk),
+            "--serial-log",
+            str(serial_log),
+            "--dry-run",
+            "--accel",
+            "tcg",
+        ]
+    )
+
+    assert result == 1
+    assert not serial_log.parent.exists()
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"serial log parent directory does not exist: {serial_log.parent}" in (
+        captured.err
+    )
 
 
 def test_start_rewrites_complete_forward_map_to_explicit_loopback_address(
