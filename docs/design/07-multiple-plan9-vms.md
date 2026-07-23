@@ -2,10 +2,11 @@
 
 ## Status
 
-Future direction and feasibility study with one successful private Windows
-management-forward prototype. This note does not expand the version 1
-implementation scope. It records the networking options that should be
-prototyped before p9qemu promises concurrent multi-VM support.
+Partially implemented. Explicit per-start IPv4 loopback addresses for the
+existing management-forward map are qualified on native Windows and Linux
+under WSL. Shared guest Ethernet, managed allocation, and lab orchestration
+remain a feasibility study and do not expand the version 1 implementation
+scope.
 
 ## Decision summary
 
@@ -51,29 +52,27 @@ This avoids making a lab depend on host administrator privileges, TAP devices,
 Windows-specific virtual switches, or the user's physical LAN.
 
 This topology is a design recommendation, not yet a compatibility claim. The
-shared Ethernet backend and loopback allocation must be exercised with real
-9front guests and supported QEMU versions on both Windows and Linux.
+shared Ethernet backend and automatic loopback allocation must still be
+exercised with real 9front guests and supported QEMU versions.
 
 ## Current behavior and limitation
 
 The current runtime profile creates one independent QEMU user-mode network per
-VM. It binds a fixed set of forwards to `127.0.0.1` and gives every VM the same
-fixed MAC address, `00:20:91:37:33:77`.
+VM. It binds the complete forward map to `127.0.0.1` by default and gives every
+VM the same fixed MAC address, `00:20:91:37:33:77`.
 
-This works well for one VM. It creates two problems when several instances are
-started concurrently:
+`--host-forward-address` now lets each start bind that same map to an explicit
+IPv4 loopback address and checks every endpoint for conflicts. This solves
+management-port contention for independently networked VMs. It deliberately
+does not allocate or persist addresses.
 
-- the second QEMU process cannot bind host ports already owned by the first;
-  and
-- the fixed MAC address becomes invalid as soon as those VMs share a Layer 2
-  network.
+The fixed MAC address remains invalid as soon as those VMs share a Layer 2
+network. Independent user-mode networks also do not form a common guest LAN.
+Their similar default addresses are not evidence that the guests share a
+subnet; each QEMU process owns a separate private network.
 
-Independent user-mode networks also do not form a common guest LAN. Their
-similar default addresses are not evidence that the guests share a subnet;
-each QEMU process owns a separate private network.
-
-Concurrent support therefore requires unique VM identities, explicit network
-topology, host-endpoint allocation, and conflict detection before launch.
+Managed shared-LAN support therefore still requires unique VM identities,
+explicit network topology, host-endpoint allocation, and lab lifecycle state.
 
 ## Goals
 
@@ -217,16 +216,16 @@ guest Ethernet, or public concurrent-start orchestration. The repeated fixed
 guest MAC was harmless only because these two user-mode networks remained
 independent; it is still invalid for the proposed shared Layer 2 lab.
 
-### Smallest public design recommended by the prototype
+### Smallest public design implemented after the prototype
 
-The smallest public slice should be one explicit option on `p9qemu start`:
+The implemented public slice is one explicit option on `p9qemu start`:
 
 ```console
 p9qemu start --instance node-20 --host-forward-address 127.0.0.20
 p9qemu start --instance node-21 --host-forward-address 127.0.0.21
 ```
 
-The option would:
+The option:
 
 - default to `127.0.0.1`, preserving every existing command and network
   default;
@@ -243,16 +242,60 @@ The option would:
 
 The preflight narrows but cannot eliminate the race between releasing its
 sockets and QEMU binding them, so QEMU startup errors remain authoritative.
-Tests should prove the default command is byte-for-byte unchanged, every
-forward receives the requested address, invalid or non-loopback addresses fail
-before launch, conflicts name the exact endpoint, and dry-run remains
-local-only.
+Tests prove the default command is byte-for-byte unchanged, every forward
+receives the requested address, invalid or non-loopback addresses fail before
+launch, conflicts name the exact endpoint, and dry-run remains local-only.
 
 Keeping the address explicit is preferable to deriving it from an instance
 path or changing instance schema 1. Host endpoint allocation is mutable local
 state, not ready-image identity. A later lab command can persist allocations in
 lab-local state after automatic allocation and crash recovery have their own
 design and qualification.
+
+### Public-option cross-platform acceptance (2026-07-23)
+
+The implemented option passed fresh live regression on the same native-Windows
+host with QEMU 10.2.0 and on Ubuntu under WSL with QEMU 6.2.0 and KVM.
+
+The Windows gate used the two retained ready-image instances from the private
+prototype. Both were started through the current checkout with
+`--instance`, explicit TCG, and `--host-forward-address` set to
+`127.0.0.20` or `127.0.0.21`. Before launch, a deliberately occupied
+`127.0.0.20:17019` caused dry-run to exit 1, name that exact endpoint, and
+print no QEMU command. The temporary listener was released normally.
+
+Both real starts printed the complete expected QEMU commands and exposed all
+fourteen listeners under separate QEMU process IDs. Address-specific native
+Windows Drawterm sessions authenticated, observed `glenda` and `cirno`, and
+received an ICMP response from `google.com`. After the first VM completed
+`fshalt`, all seven of its listeners disappeared while the second VM remained
+authenticated and online. The second VM then halted independently. Both CLI
+stderr logs were empty; no related process or listener remained; both overlays
+passed `qemu-img check` and the ready-image instance verifier.
+
+The Linux gate used two new disposable QCOW2 overlays and exercised the
+complementary `--disk` workflow. Each overlay was backed directly by the same
+immutable cache base through its WSL-mounted Windows path. The current checkout
+ran in uv isolated environments so the Windows `.venv` was not modified.
+
+Both Linux dry-runs selected KVM, passed real listener preflight, and rendered
+the expected address-specific maps. Both real starts exposed all fourteen
+listeners under separate QEMU processes. Native Linux Drawterm independently
+authenticated to both VMs and observed DNS plus ICMP connectivity. After the
+first guest halted, its foreground p9qemu session exited 0 while the second VM
+remained reachable with outbound networking. The second p9qemu session also
+exited 0 after its guest halted.
+
+Both Linux overlays subsequently passed `qemu-img check`, reported
+`dirty-flag: false`, and retained the exact cache base. The base SHA-256
+remained
+`7ff689b7b614f6884bf0a1ac525fca10b750934d99640e744823f450d28ff6b8`.
+The Ubuntu VHDX remained exactly `219465908224` bytes across the gate.
+
+This acceptance qualifies explicit repeated management forwards with Windows
+TCG and Linux KVM. It does not add automatic address allocation, persistence,
+multi-process orchestration, a shared guest Ethernet, unique shared-L2 MAC
+addresses, or a WHPX-specific concurrency claim.
 
 9front supports multiple IP interfaces and normal forwarding and translation
 controls. Its [`ip`(3)
@@ -506,8 +549,9 @@ bus or claim the same host loopback endpoints.
 8. Record packet loss, multicast or socket limitations, shutdown behavior, and
    any host firewall interaction before selecting the production bus backend.
 
-Step 5 is now complete for two guests on native Windows with TCG and the
-existing Drawterm-ready image. The other steps and host profiles remain open.
+Step 5 is complete for two guests through the public option on native Windows
+with TCG and Ubuntu under WSL with KVM. The shared-Ethernet steps and other host
+profiles remain open.
 
 The first successful experiment should use disposable disks or writable
 overlays. It must not modify a cached release image.

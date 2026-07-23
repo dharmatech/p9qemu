@@ -11,10 +11,10 @@ checked-in manifests, and public GitHub releases. See
 
 P9QEMU remains in early version 1 development, but its principal installation,
 startup, ready-image, and Drawterm-ready workflows have completed real Windows
-and Linux acceptance and are being used by downstream projects. No next
-implementation objective is currently selected. A successful private
-native-Windows prototype now informs, but does not yet authorize, the smallest
-possible public concurrent-management slice.
+and Linux acceptance and are being used by downstream projects. The explicit
+per-start host-forward address milestone is implemented and has completed
+native-Windows TCG and Ubuntu-under-WSL KVM acceptance. No next implementation
+objective is currently selected.
 
 ## Implemented user workflows
 
@@ -24,6 +24,8 @@ The public CLI currently provides:
 - `p9qemu start --disk ...` for standalone installed disks;
 - `p9qemu image create MANIFEST_URL INSTANCE_DIR` for verified ready images;
 - `p9qemu start --instance ...` for ready-image instances;
+- `p9qemu start --host-forward-address 127.x.y.z` for repeating the complete
+  host-forward map on an explicit IPv4 loopback address;
 - `--dry-run`, `--quiet`, memory, disk, media, and acceleration controls; and
 - aligned human-readable summaries plus the exact platform-native QEMU command.
 
@@ -59,10 +61,12 @@ without changing its immutable tag, manifest, archive, or image bytes.
 
 - Ubuntu under WSL: installation and startup with KVM; ready-image public
   acquisition, overlay creation, graphical boot, networking, Drawterm, and
-  clean shutdown.
+  clean shutdown; plus two concurrent KVM guests with the complete forward map
+  repeated on `127.0.0.20` and `127.0.0.21`.
 - Native Windows 11: installation and startup with TCG; ready-image public
   acquisition, overlay creation, graphical boot, networking, Drawterm, and
-  clean shutdown with TCG and explicit WHPX.
+  clean shutdown with TCG and explicit WHPX; plus two concurrent TCG guests
+  with the complete forward map repeated on `127.0.0.20` and `127.0.0.21`.
 - Windows WHPX compatibility profile:
   `-accel whpx,kernel-irqchip=off -display sdl`, with no silent fallback.
 
@@ -71,9 +75,10 @@ can vary by host, QEMU version, and guest. Linux `auto` selects KVM only when
 available. macOS remains structurally accommodated but unverified.
 
 The Drawterm image boots unattended as a CPU/auth server, retains serial
-diagnostics, exposes services only through localhost forwards, and uses the
-documented public demonstration credential. That credential must be changed
-before broadening network exposure.
+diagnostics, exposes services only through IPv4 loopback forwards, and uses the
+documented public demonstration credential. The host-forward address option
+rejects non-loopback and noncanonical addresses. The credential must still be
+changed before broadening network exposure through some other QEMU profile.
 
 ## Important current boundaries
 
@@ -89,10 +94,9 @@ before broadening network exposure.
   does not itself upload assets or create/promote GitHub releases.
 - Private-instance sensitivity metadata and fail-closed publication gates are
   future design only.
-- A private native-Windows TCG prototype ran two Drawterm-ready instances
-  concurrently with the complete forward map repeated on `127.0.0.20` and
-  `127.0.0.21`. Public address selection, Linux and WHPX qualification,
-  automatic allocation, and guest-to-guest lab networking remain future work.
+- Explicit host-forward addresses are supplied per start and are not allocated
+  automatically or persisted in instance metadata. WHPX-specific concurrency,
+  crash recovery, and guest-to-guest lab networking remain future work.
 - Automated installation is pinned to one known installer interaction and must
   be requalified for every new 9front release.
 
@@ -107,8 +111,8 @@ before broadening network exposure.
 - Large image gates begin and end with Windows free-space, WSL VHDX, and WSL
   filesystem measurements.
 
-At this review, the complete pytest suite and `ruff check` pass.
-`ruff format --check .` reports seven previously committed Python files that
+At this review, all 263 pytest tests and `ruff check` pass.
+`ruff format --check .` reports six previously committed Python files that
 would be reformatted. That formatting baseline predates this documentation
 milestone and should be resolved as a separate, reviewable cleanup rather than
 mixed into unrelated changes.
@@ -125,9 +129,7 @@ No item below is an active commitment:
 - qualification of the next 9front installation-media release;
 - a public ready-image catalog or controlled aliases;
 - broader WHPX host testing;
-- an explicit loopback-only host-forward address for `p9qemu start`, preserving
-  `127.0.0.1` as the default, after the Windows prototype is reviewed and the
-  corresponding Linux behavior is qualified;
+- automatic allocation and lab-local persistence of host-forward addresses;
 - shared-Ethernet multi-VM networking and downloadable labs; and
 - a repo-local release skill after the qualification/promotion workflow repeats
   and stabilizes.

@@ -18,6 +18,10 @@ from p9qemu.constants import (
     DEFAULT_START_MEMORY_MIB,
 )
 from p9qemu.errors import P9QemuError
+from p9qemu.forwarding import (
+    loopback_ipv4_address,
+    require_port_forwards_available,
+)
 from p9qemu.host import (
     Acceleration,
     HostInfo,
@@ -29,7 +33,13 @@ from p9qemu.host import (
 )
 from p9qemu.instance import inspect_disk, prepare_disk, validate_disk_size
 from p9qemu.media import MediaSpec, inspect_media, prepare_media
-from p9qemu.qemu import build_install_command, build_start_command, render_command
+from p9qemu.qemu import (
+    DEFAULT_HOST_FORWARD_ADDRESS,
+    build_install_command,
+    build_start_command,
+    port_forwards_for_host_address,
+    render_command,
+)
 from p9qemu.ready_image import install_local_ready_image
 from p9qemu.ready_image_acquisition import (
     acquire_ready_image_archive,
@@ -50,6 +60,13 @@ def _positive_int(value: str) -> int:
     if number <= 0:
         raise argparse.ArgumentTypeError("must be a positive integer")
     return number
+
+
+def _host_forward_address(value: str) -> str:
+    try:
+        return loopback_ipv4_address(value)
+    except P9QemuError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
 
 
 def _add_runtime_options(
@@ -137,6 +154,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--instance",
         type=Path,
         help="verified ready-image instance directory",
+    )
+    start.add_argument(
+        "--host-forward-address",
+        type=_host_forward_address,
+        default=DEFAULT_HOST_FORWARD_ADDRESS,
+        metavar="ADDRESS",
+        help=(
+            "IPv4 loopback address for every host forward "
+            f"(default: {DEFAULT_HOST_FORWARD_ADDRESS})"
+        ),
     )
 
     image = commands.add_parser(
@@ -379,15 +406,19 @@ def _start(args: argparse.Namespace) -> int:
         (
             ("Using disk image", disk),
             ("Acceleration", acceleration.name),
+            ("Host-forward address", args.host_forward_address),
         )
     )
-    _write_summary(progress, summary)
+    forwards = port_forwards_for_host_address(args.host_forward_address)
     command = build_start_command(
         executables.system,
         disk=disk,
         memory_mib=args.memory,
         acceleration=acceleration,
+        forwards=forwards,
     )
+    require_port_forwards_available(forwards)
+    _write_summary(progress, summary)
     return _run_qemu(
         command,
         system=host.system,

@@ -4,7 +4,18 @@ from types import SimpleNamespace
 import pytest
 
 from p9qemu import cli
+from p9qemu.errors import P9QemuError
 from p9qemu.host import Acceleration, HostInfo, QemuExecutables
+from p9qemu.qemu import DEFAULT_PORT_FORWARDS
+
+
+@pytest.fixture(autouse=True)
+def disable_live_forward_preflight(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        cli,
+        "require_port_forwards_available",
+        lambda _forwards: None,
+    )
 
 
 def configure_fake_windows(monkeypatch: pytest.MonkeyPatch, cache: Path) -> None:
@@ -42,6 +53,12 @@ def test_parser_defaults() -> None:
     assert start.disk == Path("9front.qcow2.img")
     assert start.instance is None
     assert start.memory == 2048
+    assert start.host_forward_address == "127.0.0.1"
+
+    addressed_start = cli.build_parser().parse_args(
+        ["start", "--host-forward-address", "127.0.0.20"]
+    )
+    assert addressed_start.host_forward_address == "127.0.0.20"
 
     image_create = cli.build_parser().parse_args(
         [
@@ -95,11 +112,107 @@ def test_start_dry_run_prints_runtime_forwards(
     assert result == 0
     output = capsys.readouterr().out
     assert (
-        f"Using disk image: {disk}\n"
-        "Acceleration:     TCG software emulation\n"
+        f"Using disk image:     {disk}\n"
+        "Acceleration:         TCG software emulation\n"
+        "Host-forward address: 127.0.0.1\n"
     ) in output
     assert "Would start QEMU:" in output
     assert "hostfwd=tcp:127.0.0.1:17564-:564" in output
+
+
+def test_start_rewrites_complete_forward_map_to_explicit_loopback_address(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    disk = tmp_path / "9front.qcow2.img"
+    disk.write_bytes(b"disk")
+    configure_fake_windows(monkeypatch, tmp_path / "cache")
+    preflighted: list[tuple] = []
+    monkeypatch.setattr(
+        cli,
+        "require_port_forwards_available",
+        lambda forwards: preflighted.append(forwards),
+    )
+
+    result = cli.run(
+        [
+            "start",
+            "--disk",
+            str(disk),
+            "--host-forward-address",
+            "127.0.0.20",
+            "--dry-run",
+            "--accel",
+            "tcg",
+        ]
+    )
+
+    assert result == 0
+    assert len(preflighted) == 1
+    assert all(forward.host_address == "127.0.0.20" for forward in preflighted[0])
+    output = capsys.readouterr().out
+    assert "Host-forward address: 127.0.0.20" in output
+    for forward in DEFAULT_PORT_FORWARDS:
+        assert (
+            f"hostfwd={forward.protocol}:127.0.0.20:{forward.host_port}"
+            f"-:{forward.guest_port}"
+        ) in output
+    assert "hostfwd=tcp:127.0.0.1:" not in output
+
+
+@pytest.mark.parametrize(
+    "address",
+    (
+        "localhost",
+        "0.0.0.0",
+        "192.0.2.1",
+        "::1",
+        "127.0.0.020",
+    ),
+)
+def test_start_parser_rejects_noncanonical_or_nonloopback_address(
+    address: str,
+) -> None:
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["start", "--host-forward-address", address])
+
+
+def test_start_reports_listener_conflict_before_printing_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    disk = tmp_path / "9front.qcow2.img"
+    disk.write_bytes(b"disk")
+    configure_fake_windows(monkeypatch, tmp_path / "cache")
+
+    def reject(_forwards) -> None:
+        raise P9QemuError(
+            "TCP host-forward endpoint is unavailable: "
+            "127.0.0.20:17019: address already in use"
+        )
+
+    monkeypatch.setattr(cli, "require_port_forwards_available", reject)
+
+    result = cli.run(
+        [
+            "start",
+            "--disk",
+            str(disk),
+            "--host-forward-address",
+            "127.0.0.20",
+            "--dry-run",
+            "--accel",
+            "tcg",
+        ]
+    )
+
+    assert result == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "127.0.0.20:17019" in captured.err
+    assert "Would start QEMU" not in captured.err
 
 
 def test_start_requires_an_existing_disk(
@@ -159,7 +272,7 @@ def test_explicit_whpx_queries_qemu_and_prints_required_profile(
     assert queried == [executable]
     output = capsys.readouterr().out
     assert (
-        "Acceleration:     WHPX with userspace irqchip and SDL (no fallback)"
+        "Acceleration:         WHPX with userspace irqchip and SDL (no fallback)"
         in output
     )
     assert "    -m 2048 -accel whpx,kernel-irqchip=off -display sdl `\n" in output
@@ -411,6 +524,7 @@ def test_start_instance_reverifies_it_and_launches_its_overlay(
         f"Manifest SHA-256:           {'b' * 64}\n"
         f"Using disk image:           {disk}\n"
         "Acceleration:               TCG software emulation\n"
+        "Host-forward address:       127.0.0.1\n"
     ) in output
     assert f"file={disk},format=qcow2" in output
     assert "Would start QEMU:" in output

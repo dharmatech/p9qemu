@@ -11,6 +11,7 @@ from p9qemu.qemu import (
     build_automated_validation_command,
     build_install_command,
     build_start_command,
+    port_forwards_for_host_address,
     render_command,
 )
 
@@ -71,6 +72,35 @@ def test_start_command_includes_kvm_and_all_known_forwards() -> None:
     network = command[-1]
     for forward in DEFAULT_PORT_FORWARDS:
         assert forward.qemu_value() in network
+
+
+def test_host_forward_address_rewrites_only_listener_addresses() -> None:
+    rewritten = port_forwards_for_host_address("127.0.0.20")
+
+    assert rewritten == tuple(
+        PortForward(
+            forward.host_port,
+            forward.guest_port,
+            protocol=forward.protocol,
+            host_address="127.0.0.20",
+        )
+        for forward in DEFAULT_PORT_FORWARDS
+    )
+    assert all(forward.host_address == "127.0.0.1" for forward in DEFAULT_PORT_FORWARDS)
+
+
+def test_explicit_default_host_forward_address_keeps_command_unchanged() -> None:
+    arguments = {
+        "executable": "qemu-system-x86_64",
+        "disk": Path("9front.qcow2.img"),
+        "memory_mib": 2048,
+        "acceleration": TCG,
+    }
+
+    assert build_start_command(**arguments) == build_start_command(
+        **arguments,
+        forwards=port_forwards_for_host_address("127.0.0.1"),
+    )
 
 
 def test_automated_install_has_dedicated_logged_serial_without_monitor() -> None:

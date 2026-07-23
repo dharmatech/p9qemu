@@ -12,12 +12,15 @@ from p9qemu.errors import P9QemuError
 from p9qemu.host import Acceleration
 
 
+DEFAULT_HOST_FORWARD_ADDRESS = "127.0.0.1"
+
+
 @dataclass(frozen=True)
 class PortForward:
     host_port: int
     guest_port: int
     protocol: str = "tcp"
-    host_address: str = "127.0.0.1"
+    host_address: str = DEFAULT_HOST_FORWARD_ADDRESS
 
     def qemu_value(self) -> str:
         return (
@@ -35,6 +38,23 @@ DEFAULT_PORT_FORWARDS = (
     PortForward(17021, 17021),
     PortForward(17022, 17022),
 )
+
+
+def port_forwards_for_host_address(
+    host_address: str,
+    forwards: tuple[PortForward, ...] = DEFAULT_PORT_FORWARDS,
+) -> tuple[PortForward, ...]:
+    """Return the same port map bound to one explicit host address."""
+
+    return tuple(
+        PortForward(
+            forward.host_port,
+            forward.guest_port,
+            protocol=forward.protocol,
+            host_address=host_address,
+        )
+        for forward in forwards
+    )
 
 
 def _option_path(path: Path, label: str, option: str) -> str:

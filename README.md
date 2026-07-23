@@ -173,10 +173,32 @@ $ p9qemu start
 ```
 
 The default runtime profile uses 2048 MiB of memory, VirtIO networking, VirtIO
-SCSI storage, and the localhost-only port forwards established by the original
-`9front-notes` scripts. On Linux, `--accel auto` uses KVM when `/dev/kvm` is
-accessible and otherwise uses TCG. Windows `auto` currently uses the proven TCG
-profile; WHPX remains an explicit opt-in because host compatibility varies.
+SCSI storage, and the loopback-only port forwards established by the original
+`9front-notes` scripts. The forwards bind to `127.0.0.1` by default. On Linux,
+`--accel auto` uses KVM when `/dev/kvm` is accessible and otherwise uses TCG.
+Windows `auto` currently uses the proven TCG profile; WHPX remains an explicit
+opt-in because host compatibility varies.
+
+To run independent VMs concurrently with the same complete host-port map,
+select a different host loopback address for each start:
+
+```console
+$ p9qemu start --instance node-20 --host-forward-address 127.0.0.20
+$ p9qemu start --instance node-21 --host-forward-address 127.0.0.21
+```
+
+`--host-forward-address` accepts only canonical IPv4 literals in
+`127.0.0.0/8`. It changes every host-side QEMU listener address while leaving
+the guest network, guest service ports, default route, and MAC address
+unchanged. The option works with both `--disk` and `--instance`; it is explicit
+per start and is not saved in instance metadata.
+
+Before every real or dry-run start, p9qemu briefly holds all seven selected TCP
+endpoints together. A conflict fails before launch and reports the exact
+address and port. The sockets are then released before QEMU starts, so QEMU's
+own bind result remains authoritative if another process wins the unavoidable
+race. Drawterm clients must use the selected address for both CPU and auth
+connections while retaining host ports `17019` and `17567`.
 
 Windows users may explicitly test hardware acceleration with:
 
@@ -210,10 +232,11 @@ the Agent9 comparison, is recorded in
 [`docs/design/03-windows-whpx-experiments.md`](docs/design/03-windows-whpx-experiments.md).
 
 Use `p9qemu start --dry-run` to display the resolved command without launching
-the VM. QEMU inherits the terminal normally; `p9qemu` never executes commands
-through a shell. `--disk` and `--instance` are mutually exclusive: `--disk`
-retains the existing standalone-disk workflow, while `--instance` selects the
-verified overlay layout created by `p9qemu image create`.
+the VM. Dry-run performs the same local listener-conflict preflight but does
+not launch QEMU. QEMU inherits the terminal normally; `p9qemu` never executes
+commands through a shell. `--disk` and `--instance` are mutually exclusive:
+`--disk` retains the existing standalone-disk workflow, while `--instance`
+selects the verified overlay layout created by `p9qemu image create`.
 
 ## Development
 
