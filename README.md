@@ -12,6 +12,10 @@ download, overlay creation, graphical boot, networking, and clean-shutdown
 tests with Linux KVM, Windows TCG, and the opt-in Windows WHPX profile. Broader
 WHPX host compatibility remains experimental.
 
+For a concise handoff across development conversations, see the current
+[project-status snapshot](docs/project-status.md) and the
+[design-note index](docs/design/README.md).
+
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/)
@@ -132,6 +136,12 @@ release image. Its immutable backing image remains in the cache and may be
 shared by many instances. Consequently, moving or deleting that cache breaks
 the instance; P9QEMU detects this instead of silently selecting another base.
 
+For private development, a halted instance directory can be copied into a
+small, frozen sibling checkpoint. See the
+[private ready-image checkpoint guide](docs/guides/private-instance-checkpoints.md)
+for the storage model, shutdown boundary, naming, verification, and credential
+rules.
+
 To identify the manifest and planned artifact without downloading the large
 archive or creating the instance, add `--dry-run`:
 
@@ -224,7 +234,33 @@ Run the checked-out CLI with:
 $ uv run p9qemu --help
 ```
 
+During active development, install the checkout as an editable isolated tool
+so ordinary `p9qemu` commands use the current source tree:
+
+```console
+$ uv tool install --force --reinstall --editable .
+```
+
+Python source edits are visible on the next invocation. Dependency,
+entry-point, or packaging changes may require reinstalling the editable tool.
+
+Before an end-user acceptance test, replace the editable installation with a
+fresh installation from the public Git repository:
+
+```console
+$ uv tool install --force --reinstall git+https://github.com/dharmatech/p9qemu.git
+```
+
+This distinction supports fast local iteration while preserving a deliberate
+test of exactly what a GitHub user receives.
+
 Tests never download the production ISO, create a real large disk, launch a VM,
 or require QEMU to be installed.
 
-Design notes live in [`docs/design`](docs/design).
+Repository-wide agent guidance lives in [`AGENTS.md`](AGENTS.md). The concise
+[project status](docs/project-status.md), searchable
+[design index](docs/design/README.md), and current
+[operational guides](docs/guides) are the recommended handoff path for a new
+development conversation.
+
+Detailed design notes live in [`docs/design`](docs/design).
