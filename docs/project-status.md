@@ -12,7 +12,9 @@ checked-in manifests, and public GitHub releases. See
 P9QEMU remains in early version 1 development, but its principal installation,
 startup, ready-image, and Drawterm-ready workflows have completed real Windows
 and Linux acceptance and are being used by downstream projects. No next
-implementation objective is currently selected.
+implementation objective is currently selected. A successful private
+native-Windows prototype now informs, but does not yet authorize, the smallest
+possible public concurrent-management slice.
 
 ## Implemented user workflows
 
@@ -87,8 +89,10 @@ before broadening network exposure.
   does not itself upload assets or create/promote GitHub releases.
 - Private-instance sensitivity metadata and fail-closed publication gates are
   future design only.
-- Concurrent multi-VM networking and downloadable lab topologies remain future
-  directions.
+- A private native-Windows TCG prototype ran two Drawterm-ready instances
+  concurrently with the complete forward map repeated on `127.0.0.20` and
+  `127.0.0.21`. Public address selection, Linux and WHPX qualification,
+  automatic allocation, and guest-to-guest lab networking remain future work.
 - Automated installation is pinned to one known installer interaction and must
   be requalified for every new 9front release.
 
@@ -121,7 +125,10 @@ No item below is an active commitment:
 - qualification of the next 9front installation-media release;
 - a public ready-image catalog or controlled aliases;
 - broader WHPX host testing;
-- concurrent multi-VM networking and downloadable labs; and
+- an explicit loopback-only host-forward address for `p9qemu start`, preserving
+  `127.0.0.1` as the default, after the Windows prototype is reviewed and the
+  corresponding Linux behavior is qualified;
+- shared-Ethernet multi-VM networking and downloadable labs; and
 - a repo-local release skill after the qualification/promotion workflow repeats
   and stabilizes.
 

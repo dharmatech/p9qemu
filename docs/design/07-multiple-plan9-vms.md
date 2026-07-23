@@ -2,7 +2,8 @@
 
 ## Status
 
-Future direction and feasibility study. This note does not expand the version 1
+Future direction and feasibility study with one successful private Windows
+management-forward prototype. This note does not expand the version 1
 implementation scope. It records the networking options that should be
 prototyped before p9qemu promises concurrent multi-VM support.
 
@@ -111,6 +112,147 @@ the `user`, `socket`, `stream`, `dgram`, and `hubport` network backend types.
 The same TCP port was also bound successfully at the same time on
 `127.0.0.2` and `127.0.0.3`. These observations support the proposed design but
 do not replace a complete VM-level qualification run.
+
+### Native Windows management-forward prototype (2026-07-23)
+
+A private native-Windows prototype completed the first guest-level test of the
+management half of this design. It did not add a public p9qemu option or test a
+shared guest Ethernet.
+
+The run used:
+
+- a clean p9qemu tree at commit `9f24271`;
+- QEMU 10.2.0 with the existing Windows default, TCG;
+- two new disposable ready-image overlays backed directly by the immutable
+  `p9qemu-9front-11554-amd64-hjfs-gmt-drawterm-001` cache base;
+- the complete existing seven-port forward map on both VMs;
+- `127.0.0.20` for the first QEMU process and `127.0.0.21` for the second; and
+- the accepted native Drawterm binary with SHA-256
+  `746938acdef38625505389886481965d68fc2b91215eee265a46eb6502d4df0a`.
+
+The cached base had SHA-256
+`7ff689b7b614f6884bf0a1ac525fca10b750934d99640e744823f450d28ff6b8`.
+Windows reported `157116219392` free bytes before the overlays were created.
+Each new overlay was initially 197120 bytes. A preflight held exclusive TCP
+listeners for all fourteen address-and-port pairs at the same time before QEMU
+was launched.
+
+These were the exact QEMU commands:
+
+```powershell
+& 'C:\Program Files\qemu\qemu-system-x86_64.exe' `
+    -m 2048 -accel tcg `
+    -net nic,model=virtio,macaddr=00:20:91:37:33:77 `
+    -device virtio-scsi-pci,id=scsi `
+    -drive if=none,id=vd0,file=C:\Users\dharm\AppData\Local\Temp\p9qemu-loopback-multivm-20260723-01\node-20\disk.qcow2,format=qcow2 `
+    -device scsi-hd,drive=vd0 `
+    -net user,hostfwd=tcp:127.0.0.20:17019-:17019,hostfwd=tcp:127.0.0.20:17564-:564,hostfwd=tcp:127.0.0.20:17010-:17010,hostfwd=tcp:127.0.0.20:17567-:567,hostfwd=tcp:127.0.0.20:17020-:17020,hostfwd=tcp:127.0.0.20:17021-:17021,hostfwd=tcp:127.0.0.20:17022-:17022
+
+& 'C:\Program Files\qemu\qemu-system-x86_64.exe' `
+    -m 2048 -accel tcg `
+    -net nic,model=virtio,macaddr=00:20:91:37:33:77 `
+    -device virtio-scsi-pci,id=scsi `
+    -drive if=none,id=vd0,file=C:\Users\dharm\AppData\Local\Temp\p9qemu-loopback-multivm-20260723-01\node-21\disk.qcow2,format=qcow2 `
+    -device scsi-hd,drive=vd0 `
+    -net user,hostfwd=tcp:127.0.0.21:17019-:17019,hostfwd=tcp:127.0.0.21:17564-:564,hostfwd=tcp:127.0.0.21:17010-:17010,hostfwd=tcp:127.0.0.21:17567-:567,hostfwd=tcp:127.0.0.21:17020-:17020,hostfwd=tcp:127.0.0.21:17021-:17021,hostfwd=tcp:127.0.0.21:17022-:17022
+```
+
+The exact address-specific Drawterm command forms were:
+
+```powershell
+$env:PASS = 'p9qemu-demo'
+
+& 'C:\Users\dharm\src\drawterm\build\msvc\drawterm.exe' `
+    -h 'tcp!127.0.0.20!17019' -a 'tcp!127.0.0.20!17567' -u glenda
+& 'C:\Users\dharm\src\drawterm\build\msvc\drawterm.exe' `
+    -h 'tcp!127.0.0.21!17019' -a 'tcp!127.0.0.21!17567' -u glenda
+
+& 'C:\Users\dharm\src\drawterm\build\msvc\drawterm.exe' `
+    -h 'tcp!127.0.0.20!17019' -a 'tcp!127.0.0.20!17567' `
+    -u glenda -G -c 'echo P9QEMU_NODE20_CLI_OK; echo $user; cat /dev/sysname'
+& 'C:\Users\dharm\src\drawterm\build\msvc\drawterm.exe' `
+    -h 'tcp!127.0.0.21!17019' -a 'tcp!127.0.0.21!17567' `
+    -u glenda -G -c 'echo P9QEMU_NODE21_CLI_OK; echo $user; cat /dev/sysname'
+
+& 'C:\Users\dharm\src\drawterm\build\msvc\drawterm.exe' `
+    -h 'tcp!127.0.0.20!17019' -a 'tcp!127.0.0.20!17567' `
+    -u glenda -G -c 'echo P9QEMU_NODE20_NETWORK; ip/ping -n 1 google.com'
+& 'C:\Users\dharm\src\drawterm\build\msvc\drawterm.exe' `
+    -h 'tcp!127.0.0.21!17019' -a 'tcp!127.0.0.21!17567' `
+    -u glenda -G -c 'echo P9QEMU_NODE21_NETWORK; ip/ping -n 1 google.com'
+```
+
+Both QEMU processes ran concurrently. The operator confirmed that both QEMU
+console windows and both address-specific graphical Drawterm sessions were
+visible and responsive. Independent command-line Drawterm sessions returned
+the expected marker, user `glenda`, and system name `cirno`. Each guest
+separately resolved `google.com` and received an ICMP response.
+
+The first guest was halted with address-specific Drawterm:
+
+```powershell
+& 'C:\Users\dharm\src\drawterm\build\msvc\drawterm.exe' `
+    -h 'tcp!127.0.0.20!17019' -a 'tcp!127.0.0.20!17567' `
+    -u glenda -G -c 'fshalt'
+```
+
+Its QEMU process exited and all seven `127.0.0.20` listeners disappeared while
+the second QEMU process and all seven `127.0.0.21` listeners remained. A new
+authenticated Drawterm command to the second VM printed
+`P9QEMU_NODE21_SURVIVES_NODE20_HALT` and received another ICMP response. The
+second guest was then halted with the equivalent `127.0.0.21` Drawterm command.
+Both QEMU processes and all fourteen listeners were gone afterward.
+
+Post-halt, the immutable base and both overlays passed `qemu-img check`. Both
+overlays were 786432 bytes, reported `dirty-flag: false`, and named the exact
+cached base as their QCOW2 backing file. The base digest was unchanged. Windows
+reported `156853702656` free bytes after the run. The focused QEMU command
+tests passed, 9/9.
+
+This result proves the same complete p9qemu forward map can be reused on two
+Windows loopback addresses while each guest retains its existing user-mode
+network, service ports, default route, and outbound connectivity. It does not
+qualify Linux, WHPX, automatic address allocation, crash recovery, a shared
+guest Ethernet, or public concurrent-start orchestration. The repeated fixed
+guest MAC was harmless only because these two user-mode networks remained
+independent; it is still invalid for the proposed shared Layer 2 lab.
+
+### Smallest public design recommended by the prototype
+
+The smallest public slice should be one explicit option on `p9qemu start`:
+
+```console
+p9qemu start --instance node-20 --host-forward-address 127.0.0.20
+p9qemu start --instance node-21 --host-forward-address 127.0.0.21
+```
+
+The option would:
+
+- default to `127.0.0.1`, preserving every existing command and network
+  default;
+- replace only `PortForward.host_address` for every entry in
+  `DEFAULT_PORT_FORWARDS`;
+- initially accept only canonical IPv4 literals in `127.0.0.0/8`;
+- hold all selected TCP endpoints during a preflight, report the exact
+  conflicting address and port, then release them immediately before QEMU
+  launch;
+- render the complete resulting QEMU command before launch as it does today;
+  and
+- remain explicit per start, with no automatic allocation, persistence,
+  instance-metadata change, or lab lifecycle promise.
+
+The preflight narrows but cannot eliminate the race between releasing its
+sockets and QEMU binding them, so QEMU startup errors remain authoritative.
+Tests should prove the default command is byte-for-byte unchanged, every
+forward receives the requested address, invalid or non-loopback addresses fail
+before launch, conflicts name the exact endpoint, and dry-run remains
+local-only.
+
+Keeping the address explicit is preferable to deriving it from an instance
+path or changing instance schema 1. Host endpoint allocation is mutable local
+state, not ready-image identity. A later lab command can persist allocations in
+lab-local state after automatic allocation and crash recovery have their own
+design and qualification.
 
 9front supports multiple IP interfaces and normal forwarding and translation
 controls. Its [`ip`(3)
@@ -363,6 +505,9 @@ bus or claim the same host loopback endpoints.
    TCG and the relevant tested accelerators.
 8. Record packet loss, multicast or socket limitations, shutdown behavior, and
    any host firewall interaction before selecting the production bus backend.
+
+Step 5 is now complete for two guests on native Windows with TCG and the
+existing Drawterm-ready image. The other steps and host profiles remain open.
 
 The first successful experiment should use disposable disks or writable
 overlays. It must not modify a cached release image.
